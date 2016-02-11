@@ -55,10 +55,16 @@ function [estParams, seq, LL, iterTime] = myem_mod(currentParams, seq, varargin)
 %                 (default: false)
 % wbar          - keeps track of a waitbar for DimReduce
 %
+% ---GNU General Public License Copyright---
+% This file is a modified version of myem.m inside DataHigh.
+% 
+% DataHigh is free software: you can redistribute it and/or modify
+% it under the terms of the GNU General Public License as published by
+% the Free Software Foundation, version 2. 
+%
 % @ 2009 Byron Yu         byronyu@stanford.edu
 %        John Cunningham  jcunnin@stanford.edu
 %  Copyright Benjamin Cowley, Matthew Kaufman, Zachary Butler, Byron Yu, 2012-2013
-
 
 
   emMaxIters   = 500;

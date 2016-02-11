@@ -62,7 +62,8 @@ for lap = 1:numLaps
     int_at_maze  = idx_lap;
     X_lap        = X(idx_lap(1):idx_lap(2));
     Y_lap        = Y(idx_lap(1):idx_lap(2));
-    acc_dst      = cumsum(sqrt((X_lap - X_lap(1)).^2 + (Y_lap - Y_lap(1)).^2));
+    acc_dst      = [0; cumsum(sqrt((X_lap(2:end) - X_lap(1:end-1)).^2 + ...
+                                   (Y_lap(2:end) - Y_lap(1:end-1)).^2))];
     speed_lap    = speed(idx_lap(1):idx_lap(2));
     
     %sect 1:enter, 6:exit

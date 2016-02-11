@@ -37,6 +37,7 @@ end
 % Extract firing rates in the section given
 for lap = 1:numLaps  
     
+    %first entering in the selected "in" section, last leave from "out" section
     idx_lap = [sum(D(lap).sections(sect_in,1)), sum(D(lap).sections(sect_out,2))];
     if int == 13
     %for wheel section extract spikes when the wheel is moving    
@@ -51,7 +52,8 @@ for lap = 1:numLaps
     
     X_lap        = D(lap).X(idx_lap(1):idx_lap(2));
     Y_lap        = D(lap).Y(idx_lap(1):idx_lap(2));
-    acc_dst      = cumsum(sqrt((X_lap - X_lap(1)).^2 + (Y_lap - Y_lap(1)).^2));
+    acc_dst      = [0; cumsum(sqrt((X_lap(2:end) - X_lap(1:end-1)).^2 + ...
+                                   (Y_lap(2:end) - Y_lap(1:end-1)).^2))];
     speed_lap    = D(lap).speed(idx_lap(1):idx_lap(2));
 
     t_lap        = idx_lap(2) - idx_lap(1) + 1;

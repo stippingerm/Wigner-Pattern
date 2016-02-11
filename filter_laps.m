@@ -1,5 +1,5 @@
 function D = filter_laps(D,varargin)
-%Filter the laps in nteh struct D with firing rate count below 1 s.d of
+%Filter the laps in the struct D with firing rate count below 1 s.d. of
 %       the mean of all the laps.
 %
 %Ruben Pinzon @2015
@@ -19,13 +19,13 @@ if strcmp(type,'spike_cnt')
     mu = mean(cnt_total);
     sd = std(cnt_total);
 
-    f_out = cnt_total < (mu-sd); 
+    keep = cnt_total >= (mu-sd); 
     
 else 
     T = [D.T];
-    f_out = T < (mean(T)-std(T));
+    keep = T >= (mean(T)-std(T));
 end
 
-fprintf('%d trials filter out: [%s]\n', sum(f_out), sprintf('%d ',[D(find(f_out==1)).trialId]))
+fprintf('%d trials filter out: [%s]\n', sum(~keep), sprintf('%d ',[D(~keep).trialId]))
 
-D = D(~f_out);
+D = D(keep);

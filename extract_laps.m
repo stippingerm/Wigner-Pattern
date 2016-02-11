@@ -1,12 +1,12 @@
 function D = extract_laps(Fs,spk,speed,X,Y,events,isIntern,laps,TrialType,wh_speed)
-%EXTRACT LAP Takes the HC-5 database and divides the vectors into laps. more
+%EXTRACT LAP Takes the HC-5 database and divides the vectors into laps. More
 %            information about the database in
 %            crcns.org/files/data/hc-5/crcns-hc5-data-description.pdf
 %
 %            INPUTS:
 %            Fs: sampling frequency (Default: 1250)
 %            spk: spikes times
-%            speed: speed of the animal in during the whole experiment
+%            speed: speed of the animal during the whole experiment
 %            X:  position of the animal in the x-axis for the whole experiment
 %            Y:  position of the animal in the y-axis for the whole experiment
 %            events: vector containing the time start/end for each lap and section
@@ -35,11 +35,13 @@ color           = hsv(4);
 % Extract spks when the mouse is running 
 for lap = 1:numLaps  
 
-    
+    %Note: section 1 is definitely the entering place but the last section (No 13)
+    %is not necessrily the section left last
     idx_lap      = [events{lap}(1,1), events{lap}(end,2)];
     X_lap        = X(idx_lap(1):idx_lap(2));
     Y_lap        = Y(idx_lap(1):idx_lap(2));
-    acc_dst      = cumsum(sqrt((X_lap - X_lap(1)).^2 + (Y_lap - Y_lap(1)).^2));
+    acc_dst      = [0; cumsum(sqrt((X_lap(2:end) - X_lap(1:end-1)).^2 + ...
+                                   (Y_lap(2:end) - Y_lap(1:end-1)).^2))];
     speed_lap    = speed(idx_lap(1):idx_lap(2));
     wh_speed_lap = wh_speed(idx_lap(1):idx_lap(2));
 
@@ -53,11 +55,13 @@ for lap = 1:numLaps
             tmp              = zeros(1, t_lap); 
             cnt              = cnt + 1;
             
+            %Here the input from get_spikes must be filtered again because
+            %get_spikes uses only lap start times and idx_lap(:) might differ
             idx              = spk{lap,neu}>=idx_lap(1) & spk{lap,neu}<=idx_lap(end);
             %aligned to the start of the section            
             spikes_lap{cnt}      = spk{lap,neu}(idx) - idx_lap(1) + 1;
             tmp(spikes_lap{cnt}) = 1; 
-            %convolve the spike trains with a gauss filter 100 m
+            %convolve the spike trains with a gauss filter 100 ms
             %firing(cnt,:)    = Fs*conv(tmp,kernel, 'same');
             spk_train(cnt, :) = tmp; 
         end

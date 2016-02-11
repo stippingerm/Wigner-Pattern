@@ -34,3 +34,8 @@ minmax(mod1)
 ylim(minmax(mod2))
 minmax(mod2)
 set(gca,'dataaspectratio',[1 1 1])
+
+
+
+function mm = minmax(s)
+mm = [ min(s), max(s) ];

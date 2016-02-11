@@ -8,12 +8,12 @@
 %          DESCRIPTION:
 %          In the first part (1) the scrip reads and extract the spike times
 %          of each cell for the whole duration of the experiment. Then, (2) the
-%          running section of the protocol is selected, which correspond to
+%          running section of the protocol is selected, which corresponds to
 %          when the animal enters the T-maze and runs to the left/right arm
 %          alternating between choices. The spike information is wrapped up
 %          in a DataHigh struct for processing with the GPFA model. This
 %          struct of dimension (1 x n_laps) contains as fields: y, trialId,
-%          T, the binned spike train os zeros and ones (n_cells x n_bins),
+%          T, the binned spike train of zeros and ones (n_cells x n_bins),
 %          the trial id, and the number of bins, respectively. Other fields
 %          are optional. (3) The GPFA model is trained for left, right and all
 %          the trials separately, thus, generating three models. (4) the neural
@@ -69,9 +69,9 @@ conditions      = {'_left', '_right', ''};
 middle_arm      = true;
 saveplot        = true;
 debug           = true; %to show diganostic plots
-bin_size        = 0.04;  %20 ms
-zDim            = 10;    % Target latent dimensions
-results(1).bin  = bin_size; %struct to save the results
+bin_size_s      = 0.04; %40 ms
+zDim            = 10; % Target latent dimensions
+results(1).bin  = bin_size_s; %struct to save the results
 min_firing      = 1.1; %minimum firing rate of the pyramidal cells
 showpred        = false; %show the predicted and real firing rates
 folds           = 3; %number of fold for crossvalidation
@@ -144,7 +144,7 @@ if middle_arm
 end
 
 
-[D,keep_cell]   = segment(SpkRun_DH, bin_size, Fs, min_firing,'data');
+[D,keep_cell]   = segment(SpkRun_DH, bin_size_s, Fs, min_firing,'data');
 [D_left, D_right] = split_trails(D);
 
 try

@@ -37,16 +37,16 @@ v_laps      = [P.trialId];
 model_like  = zeros(length(models), n_laps);
     
 for m = 1 : length(models)
-    likelikehood   = -Inf*ones(folds, n_laps);
+    likelikehood   = nan(folds, n_laps);
 
     for ifold = 1 : folds
         
         if ~useAllTrials
+            %remove trials used during training
             usedlaps    = models{m}.trainTrials{ifold};
             unseenP     = ones(1,n_laps);
             for u = 1 : length(usedlaps)
-                u_idx = find(v_laps == usedlaps(u));
-                unseenP(u_idx) = 0;
+                unseenP(v_laps == usedlaps(u)) = 0;
             end
             unseenP = find(unseenP ==1);
         else
@@ -64,13 +64,13 @@ for m = 1 : length(models)
             end
             
             [traj, ll] = exactInferenceWithLL(P(lap), model,'getLL',1);        
-            likelikehood(ifold,lap) = ll;                  
+            likelikehood(ifold,lap) = ll / P(lap).T;                  
 
         end       
         %remove trials used during training
     end
     
-    model_like(m,:) = max(likelikehood);
+    model_like(m,:) = nanmean(likelikehood);
 end
 
 [~, max_mod]    = max(model_like);

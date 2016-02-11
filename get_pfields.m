@@ -1,5 +1,5 @@
 function [stable, S] = get_pfields(D, in, out, min_speed, method, debug, show_firing)
-%GET_PFIELDS This function process a data array of spike times to indetify
+%GET_PFIELDS This function processes a data array of spike times to indetify
 %the cells with stable place fields. The criteria used to define a stable
 %place field follows the definitions at
 %
@@ -7,7 +7,7 @@ function [stable, S] = get_pfields(D, in, out, min_speed, method, debug, show_fi
 %Internally generated cell assembly sequences in the rat hippocampus.
 %Science, 321(5894), 1322-1327.
 %
-%Villette, V. et al. ernally recurring hippocampal
+%Villette, V. et al. Internally recurring hippocampal
 %sequences as a population template of spatiotemporal information.
 %Neuron, 88(2), 357-366.
 %
@@ -57,7 +57,8 @@ for lap = 1:numLaps
     idx_lap      = [sum(D(lap).sections(sect_in,1)), sum(D(lap).sections(sect_out,2))];
     X_lap        = D(lap).X(idx_lap(1):idx_lap(2));
     Y_lap        = D(lap).Y(idx_lap(1):idx_lap(2));
-    acc_dst      = cumsum(sqrt((X_lap - X_lap(1)).^2 + (Y_lap - Y_lap(1)).^2));
+    acc_dst      = [0; cumsum(sqrt((X_lap(2:end) - X_lap(1:end-1)).^2 + ...
+                                   (Y_lap(2:end) - Y_lap(1:end-1)).^2))];
     speed_lap    = D(lap).speed(idx_lap(1):idx_lap(2));
     
     t_lap        = idx_lap(2) - idx_lap(1) + 1;
