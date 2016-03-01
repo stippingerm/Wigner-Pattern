@@ -7,9 +7,9 @@ import os
 
 
 # Old class to extract the data from the Matlab processed files of the hc-5 database
-class LoadBuszaki(object):
+class LoadBuzsaki(object):
     """
-    Class to extract and store information from Buszaki's databases
+    Class to extract and store information from Buzsaki's databases
 
     2015 RP
     """
@@ -70,7 +70,7 @@ class LoadBuszaki(object):
 
     def get_var(self, field):
         """
-        Extract an existing variable from the Buszaki's MAT file
+        Extract an existing variable from the Buzsaki's MAT file
 
         :param field: the name of the variable
         :return: variable

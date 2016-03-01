@@ -8,12 +8,12 @@
 
 clc, close all; clear all;
 
-basepath        = '/media/bigdata/';
+basepath        = 'D:/KFKI/data_mat/';
 [files, animals, roots]= get_matFiles(basepath);
 
 
 %========================Paramteres and variables==========================
-animal          = 6;
+animal          = 2;
 data            = load(files{animal});
 clusters        = data.Spike.totclu;
 laps            = data.Laps.StartLaps(data.Laps.StartLaps~=0); %@1250 Hz
@@ -29,7 +29,8 @@ speed           = data.Track.speed;
 wh_speed        = data.Laps.WhlSpeedCW;
 isIntern        = data.Clu.isIntern;
 numLaps         = length(events);
-[spk, spk_lap]  = get_spikes(clusters, data.Spike.res,laps);
+%spikes per neuron, the laps separated by [{StartLaps} SyncOff]
+[spk, spk_lap]  = get_spikes(clusters, data.Spike.res, laps);
 n_cells         = size(spk_lap,2);
 n_pyrs          = sum(isIntern==0);
 TrialType       = data.Laps.TrialType;
@@ -41,18 +42,18 @@ out             = 'lat_arm';
 debug           = false;
 namevar         = 'run';
 %segmentation and filtering of silent neurons
-bin_size        = 0.04; %ms
+bin_size_s      = 0.04; %seconds
 min_firing      = 1.0; %minimium firing rate
 filterTrails    = false; % filter trails with irregular speed/spike count?
 % GPFA trainign
 n_folds         = 3;
-zDim            = 5; %latent dimension
+zDim            = 10; %latent dimension
 showpred        = false; %show predicted firing rate
 train_split      = true; %train GPFA on left/right separately?
 name_save_file  = '_trainedGPFA_run.mat';
 test_lap        = 10;
 maxTime         = 0; %maximum segmentation time 0 if use all
-%%
+
 % ========================================================================%
 %==============   (1) Extract trials              ========================%
 %=========================================================================%
@@ -80,7 +81,7 @@ S = get_section(D, in, out, debug, namevar); %lap#1: sensor errors
 %load run model and keep the same neurons
 % run = load([roots{animal} '_branch2_results40ms.mat']);
 
-[R,keep_neurons]    = segment(S, bin_size, Fs, min_firing,...
+[R,keep_neurons]    = segment(S, bin_size_s, Fs, min_firing,...
                               [namevar '_spike_train'], maxTime);
 %%
 % ========================================================================%
@@ -104,9 +105,8 @@ end
 %============== (5)    Show Neural Trajectories   ========================%
 %=========================================================================%
 
-colors = cgergo.cExpon([2 3 1], :);
-labels = [R.type];
-Xorth = show_latent({M},R,colors, labels);
+colors = [1 0 0; 0 0 1; 0.1 0.1 0.1; 0.1 0.1 0.1];
+Xorth = show_latent({M},R,colors);
 
 %======================================================================== %
 %============== (6)    Save data                  ========================%
@@ -125,7 +125,7 @@ plot(mean([R_right.y],2),'b','displayname','wheel after right')
 ylabel('Average firing rate')
 xlabel('Cell No.')
 set(gca,'fontsize',14)
-savefig()
+savefig()     
 %=========================================================================%
 %=========(8) Compute loglike P(run|model_run)       =====================%
 %=========================================================================%
@@ -148,12 +148,10 @@ label.yaxis = 'P(run_j| Models_{left run, right run})';
 compareLogLike(R, Xtats, label)
 
 %XY plot
-cgergo = load('colors');
-
 label.title = 'LDA classifier';
 label.xaxis = 'P(run_j|Model_{left run})';
 label.yaxis = 'P(run_j|Model_{right run})';
-LDAclass(Xtats, label, cgergo.cExpon([2 3], :))
+LDAclass(Xtats, label)
 
 %=========================================================================%
 %=========(9) Compute loglike P(wheel|run_model)     =====================%
@@ -167,7 +165,7 @@ allTrials       = true; %use all trials of running to test since they are
                         %all unseen to the wheel model
 
 S = get_section(D, in, out, debug, namevar); %lap#1: sensor errors 
-W = segment(S, bin_size, Fs, keep_neurons,...
+W = segment(S, bin_size_s, Fs, keep_neurons,...
                 [namevar '_spike_train'], maxTime);
 W = filter_laps(W);
 W = W(randperm(length(W))); 

@@ -53,7 +53,7 @@ maxTime_wh      = 6;                                                       %maxi
 maxTime_run     = 0;                                                       % 0: use all the recording
 
 %============segmentation and filtering of silent neurons
-bin_size        = 0.04;                                                    %Segmenting window in seconds
+bin_size_s      = 0.04;                                                    %Segmenting window in seconds
 min_firing      = 1.0;                                                     %minimium firing rate to filter cells
 
 %=========== GPFA training
@@ -90,9 +90,9 @@ W = get_section(D, in_wh, out_wh, debug, namevar_wh);
 %============== (3) Segment the spike vectors     ========================%
 %=========================================================================%
 
-[R,keep_neurons]    = segment(R, bin_size, Fs, min_firing,...
+[R,keep_neurons]    = segment(R, bin_size_s, Fs, min_firing,...
                               [namevar_run '_spike_train'], maxTime_run);  %segment run trial 
-W                   = segment(W, bin_size, Fs, keep_neurons,...
+W                   = segment(W, bin_size_s, Fs, keep_neurons,...
                               [namevar_wh '_spike_train'], maxTime_wh);    %segment wheel trial with the same neurons *kept* in "run" 
                           
 if filterlaps

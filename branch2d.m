@@ -7,7 +7,7 @@
 %   along the stopping periods extracted. (4) The super vector of activity during
 %   the stopping periods is plotted. The super vector is constructed by joining
 %   the spike times of all neurons in a single vector. Then silent periods of at
-%   lest 50ms are detected to extract proto events. (5) Shows the proto events
+%   least 50ms are detected to extract proto events. (5) Shows the proto events
 %   extracted (6) Compute P(proto_event|model) with the model trained during the
 %   running section, and classify each proto events according to the maximum likelihood
 %   (7) Here shuffling controls are performed to test the values of loglikehood found.
@@ -233,7 +233,7 @@ end
 %=========================================================================%
 
 %50 ms window to detect disconnected sequences accoding to Foster & Wilson
-%60 ms window according to Diba Buszaki 2007
+%60 ms window according to Diba Buzsaki 2007
 %at least 10 neurons active 
 
                                    %replay preplay considered a event
@@ -637,7 +637,7 @@ for r = 1 : n_perms
         loglike_CM(r,p)  = CM_time(r).stats(1).posterior(group(p),p);
     end
     groups(r,:) = group;
-    clear group==
+    clear group
 end
 p         = anova1(loglike_CM(:),groups(:)) 
 

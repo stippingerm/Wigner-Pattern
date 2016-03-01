@@ -1,5 +1,5 @@
 function P = extractPoints(W)
-%EXTARCTPOINTS is an auxiliar function to extract the start, 1/3, 1/2, 2/3
+%EXTARCTPOINTS is an auxiliary function to extract the start, 1/3, 1/2, 2/3
 %and end point of the latent variables in the data struct W, with name
 %Xorth. P is [(5 x n_dims) x n_laps], where n_laps = len(W)
 %

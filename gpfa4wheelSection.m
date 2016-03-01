@@ -41,7 +41,7 @@ out             = 'wheel';
 debug           = true;
 namevar         = 'wheel';
 %segmentation and filtering of silent neurons
-bin_size        = 0.04; %ms
+bin_size_s      = 0.04; %40 ms
 min_firing      = 1.0; %minimium firing rate
 % GPFA trainign
 n_folds         = 3;
@@ -82,7 +82,7 @@ R = get_section(D(2:end), in, out, debug, namevar); %lap#1: sensor errors
 %load run model and keep the same neurons
 % run = load([roots{animal} '_branch2_results40ms.mat']);
 
-[W,keep_neurons]    = segment(R, bin_size, Fs, min_firing,...
+[W,keep_neurons]    = segment(R, bin_size_s, Fs, min_firing,...
                               [namevar '_spike_train'], maxTime);
 if filterlaps
     W                   = filter_laps(W);
@@ -178,7 +178,7 @@ allTrials       = true; %use all trials of running to test since they are
                         %all unseen to the wheel model
 
 S = get_section(D, in, out, debug, namevar); %lap#1: sensor errors 
-R = segment(S, bin_size, Fs, keep_neurons,...
+R = segment(S, bin_size_s, Fs, keep_neurons,...
                 [namevar '_spike_train'], maxTime);
 R = filter_laps(R);
 %R = R(randperm(length(R))); 

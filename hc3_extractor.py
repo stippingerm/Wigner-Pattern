@@ -45,7 +45,7 @@ def raster(cells, title='', fig=None, exclude=None):
 
 def get_files(folder_base):
     """
-    Reads the .spk .clu .whl .res .eeg from hc databases from Buszaki Lab
+    Reads the .spk .clu .whl .res .eeg from hc databases from Buzsaki Lab
 
     :param folder_base: the main folder containing the hC database files
     :return: spk_cells: [n_cells, :] spike times for each cell

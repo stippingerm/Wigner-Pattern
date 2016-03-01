@@ -3,12 +3,12 @@
 
 kernel = 3;
 switch kernel
-    case 1;        k =@(x,y) 1*x'*y; % Linear      
+    case 1; k =@(x,y) 1*x'*y; % Linear      
     case 2; k =@(x,y) 1*min(x,y); % Brownian     
     case 3; k =@(x,y) exp(-10*(x-y)'*(x-y)); % Squared exponential     
     case 4; k =@(x,y) exp(-1*sqrt((x-y)'*(x-y)));     
-    case 5; k =@(x,y) exp(-1*sin(50*pi*(x-y))^2) % Periodic     
-    case 6; k =@(x,y) exp(-100*min(abs(x-y), abs(x+y))^2) ;
+    case 5; k =@(x,y) exp(-1*sin(50*pi*(x-y))^2); % Periodic     
+    case 6; k =@(x,y) exp(-100*min(abs(x-y), abs(x+y))^2);
 end
 
 % Choose points at which to sample 15 

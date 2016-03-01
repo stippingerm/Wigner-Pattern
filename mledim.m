@@ -17,7 +17,7 @@
 % Note: There is a small error in the paper which has been corrected 
 % in this code: the normalizer should be k-2, not k-1.  
 
-function [mledim] = mledim(X,k1,k2);
+function [mledim] = mledim(X,k1,k2)
 
 % check values of k1, k2
 if(nargin==1) %k1, k2 not provided. Setting k1=k2=10.

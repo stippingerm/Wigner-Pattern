@@ -14,7 +14,7 @@ basepath        = '/media/bigdata/';
 animal          = 6;
 Typetrial_tx    = {'left', 'right', 'errorLeft', 'errorRight'};
 %segmentation and filtering of silent neurons
-bin_size        = 0.04; %ms
+bin_size_s      = 0.04; %40 ms
 min_firing      = 1.0; %minimium firing rate
 filterTrails    = false; % filter trails with irregular speed/spike count?
 % GPFA trainign
@@ -42,7 +42,7 @@ load([roots{animal} '_trainedGPFA_run.mat'])
 %=========            (3) Segment Proto Events             ===============%
 %=========================================================================%
 
-PR = segment(P, bin_size/10, Fs, keep_neurons,'data', maxTime);
+PR = segment(P, bin_size_s/10, Fs, keep_neurons,'data', maxTime);
 PR = filter_laps(PR);
 %=========================================================================%
 %=========            (4) P(proto event |run model)        ===============%

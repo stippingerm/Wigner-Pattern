@@ -6,7 +6,7 @@ function grids = get_grids(X, segments, connect, show, roiDims)
 %               the rectagles will be palced
 %               segments in the number of rectangles to fit in th elenght
 %               of the accumulated distance spanned by X
-%               connect (1 or 0) is an option to connect adyacent
+%               connect (1 or 0) is an option to connect adjacent
 %               rectangles or leave them disconnected.
 %               show (1 or 0) to show the rectagles and the instructive
 %               path. roiDims = [width lenght] of rectangles

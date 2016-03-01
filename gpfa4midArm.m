@@ -41,7 +41,7 @@ out             = 'mid_arm';
 debug           = false;
 namevar         = 'run';
 %segmentation and filtering of silent neurons
-bin_size        = 0.04; %ms
+bin_size_s      = 0.04; %40 ms
 min_firing      = 1.0; %minimium firing rate
 filterTrails    = false; % filter trails with irregular speed/spike count?
 % GPFA trainign
@@ -80,7 +80,7 @@ S = get_section(D, in, out, debug, namevar); %lap#1: sensor errors
 %load run model and keep the same neurons
 % run = load([roots{animal} '_branch2_results40ms.mat']);
 
-[R,keep_neurons]    = segment(S, bin_size, Fs, min_firing,...
+[R,keep_neurons]    = segment(S, bin_size_s, Fs, min_firing,...
                               [namevar '_spike_train'], maxTime);
 %%
 % ========================================================================%
@@ -168,7 +168,7 @@ allTrials       = true; %use all trials of running to test since they are
                         %all unseen to the wheel model
 
 S = get_section(D, in, out, debug, namevar); %lap#1: sensor errors 
-W = segment(S, bin_size, Fs, keep_neurons,...
+W = segment(S, bin_size_s, Fs, keep_neurons,...
                 [namevar '_spike_train'], maxTime);
 W = filter_laps(W);
 W = W(randperm(length(W))); 

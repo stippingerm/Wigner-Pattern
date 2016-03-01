@@ -1,5 +1,5 @@
 function D=get_high(data, MaxTimeE, trial, color, label, filterTrial)
-%GET_HIGH this function create the data struct needed for DataHigh library
+%GET_HIGH this function creates the data struct needed for DataHigh library
 %         data: is a cell with dims: Laps x Cells
 %         MaxTimeE: is the desired length of the spike trials
 %         trial: is a vector indicating the condition of each trial

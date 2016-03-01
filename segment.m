@@ -1,4 +1,4 @@
-function [F,keep_neurons]=segment(D, bin_size, Fs, keep_neurons, name_var, maxTime)
+function [F,keep_neurons]=segment(D, bin_size_s, Fs, keep_neurons, name_var, maxTime)
 %SEGMENT remove low firing rate neurons and segments in non-overlapping
 %        windows
 %        namevar: is the name of the field in the structure D which is to be
@@ -33,7 +33,7 @@ yDim            = sum(keep_neurons);
 useSqrt         = 1; % square root tranform for pre-processing?    
                                    
 
-bin_width       = ceil(bin_size * Fs); % bin size (Seconds * Fs) = samples
+bin_width       = ceil(bin_size_s * Fs); % bin size (Seconds * Fs) = samples
 
 %Extrat bins for one trial, since all the trials
 %are of the same duration
@@ -53,7 +53,7 @@ for ilap = 1 : length(Temp)
     for t = 1:T
       iStart        = bin_width * (t-1) + 1;
       iEnd          = bin_width * t;
-      seq.y(:,t)    = sum(Temp(ilap).data(:, iStart:iEnd), 2)./bin_size;
+      seq.y(:,t)    = sum(Temp(ilap).data(:, iStart:iEnd), 2)./bin_size_s;
     end
     %normalization with square root transform
     if useSqrt
