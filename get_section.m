@@ -1,9 +1,10 @@
 function R = get_section(D, in, out, debug, name)
 %GET_SECTION add a new field to the struct D with the firing rate of the
-%cells in a section specifie by in, out. D is generated from extract_laps.m
+%cells in a section specified by in, out. D is generated from extract_laps.m
 %
 %
-%ruben pinzon
+%Last revision by:
+%Marcell Stippinger, 2016
 
 numLaps  = length(D);
 color    = hsv(numLaps);
@@ -37,26 +38,26 @@ end
 % Extract firing rates in the section given
 for lap = 1:numLaps  
     
-    %first entering in the selected "in" section, last leave from "out" section
-    idx_lap = [sum(D(lap).sections(sect_in,1)), sum(D(lap).sections(sect_out,2))];
+    % in some rare cases both left and right sections are visited
+    % but non-visited section have entering and leaving time "0"
+    idx_sec = [max(D(lap).sections(sect_in,1)), max(D(lap).sections(sect_out,2))];
     if int == 13
     %for wheel section extract spikes when the wheel is moving    
         wheelNonZero    = find(D(lap).wh_speed~=0);
         if isempty(wheelNonZero)
-            fprintf('Skipped lap %d without wheel run\n',lap)
-            return
+            sprintf('Skipped lap %d without wheel run\n',lap)
+            continue;
         end
-        idx_lap         = [wheelNonZero(1), wheelNonZero(end)];
-        eval(['D(lap).' name '_wheelNonZero=wheelNonZero;'])
+        idx_sec         = [wheelNonZero(1), wheelNonZero(end)];
+        D(lap).([name '_wheelNonZero']) = wheelNonZero;
     end
     
-    X_lap        = D(lap).X(idx_lap(1):idx_lap(2));
-    Y_lap        = D(lap).Y(idx_lap(1):idx_lap(2));
-    acc_dst      = [0; cumsum(sqrt((X_lap(2:end) - X_lap(1:end-1)).^2 + ...
-                                   (Y_lap(2:end) - Y_lap(1:end-1)).^2))];
-    speed_lap    = D(lap).speed(idx_lap(1):idx_lap(2));
+    X_sec        = D(lap).X(idx_lap(1):idx_lap(2));
+    Y_sec        = D(lap).Y(idx_lap(1):idx_lap(2));
+    acc_dst_sec  = D(lap).acc_dst(idx_lap(1):idx_lap(2))-D(lap).acc_dst(idx_lap(1));
+    speed_sec    = D(lap).speed(idx_lap(1):idx_lap(2));
 
-    t_lap        = idx_lap(2) - idx_lap(1) + 1;
+    t_sec        = idx_lap(2) - idx_lap(1) + 1;
     %firing       = D(lap).firing_rate(:,idx_lap(1):idx_lap(2)); 
     spk_train    = D(lap).spike_train(:,idx_lap(1):idx_lap(2)); 
 
@@ -71,7 +72,7 @@ for lap = 1:numLaps
                 'displayname',sprintf('Lap %d',D(lap).trialId))
             xlabel('Samples'), ylabel('Wheel speed')
         else
-            plot(X_lap, Y_lap, 'color', color(lap,:),...
+            plot(X_sec, Y_sec, 'color', color(lap,:),...
                 'displayname',sprintf('Lap %d',D(lap).trialId))
             xlabel('X position'), ylabel('Y position')
         end
@@ -82,12 +83,15 @@ for lap = 1:numLaps
 
     end              
 
+    
+    R(lap).([name '_interval'])     = idx_sec;
+    %R(lap).([name '_spk_duty'])    = sum(spk_train,2);
+    
     %Type of trial
-    %eval(['R(lap).' name '_firing=firing;'])
-    R(lap).trialId = D(lap).trialId;   
-    R(lap).type    = D(lap).type; 
-    eval(['R(lap).' name '_spike_train=spk_train;'])
-    eval(['R(lap).' name '_interval=idx_lap;'])
-    eval(['R(lap).' name '_speed=speed_lap;'])
+    %R(lap).([name '_firing'])      = firing;
+    R(lap).trialId                  = D(lap).trialId;   
+    R(lap).type                     = D(lap).type; 
+    R(lap).([name '_spike_train'])  = spk_train;
+    %R(lap).([name '_speed'])        = speed_sec;
     
 end

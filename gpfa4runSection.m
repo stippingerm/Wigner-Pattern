@@ -6,63 +6,65 @@
 %Version 1.0 Ruben Pinzon@2015
 
 
-clc, close all; clear all;
+clc, close all; %clear all;
+run('gpfa4runSectionSettings.m');
 
-basepath        = 'D:/KFKI/data_mat/';
-[files, animals, roots]= get_matFiles(basepath);
+basepath        = '~/marcell/_Data_hc-5/';
+workpath        = '~/marcell/napwigner/work/';
+[files, roots, animals] = get_matFiles(basepath,'.*_BehavElectrData\.mat');
 
 
 %========================Paramteres and variables==========================
-animal          = 2;
-data            = load(files{animal});
-clusters        = data.Spike.totclu;
-laps            = data.Laps.StartLaps(data.Laps.StartLaps~=0); %@1250 Hz
-laps(end+1)     = data.Par.SyncOff;
+fprintf('\nSelecting %d: %s\n\n',settings.animal,files{settings.animal});
+data            = load(files{settings.animal});
 mazesect        = data.Laps.MazeSection;
 events          = data.Par.MazeSectEnterLeft;
 Fs              = data.Par.SamplingFrequency;
 X               = data.Track.X;
 Y               = data.Track.Y;
 eeg             = data.Track.eeg;
-time            = linspace(0, length(eeg)/1250,length(eeg));
+time            = linspace(0, length(eeg)/Fs,length(eeg));
 speed           = data.Track.speed;
 wh_speed        = data.Laps.WhlSpeedCW;
 isIntern        = data.Clu.isIntern;
 numLaps         = length(events);
-%spikes per neuron, the laps separated by [{StartLaps} SyncOff]
-[spk, spk_lap]  = get_spikes(clusters, data.Spike.res, laps);
-n_cells         = size(spk_lap,2);
+spk_clust       = get_spikes(data.Spike.totclu, data.Spike.res);
+n_cells         = length(isIntern);
 n_pyrs          = sum(isIntern==0);
-TrialType       = data.Laps.TrialType;
-Typetrial_tx    = {'left', 'right', 'errorLeft', 'errorRight'};
+TrialType       = data.Par.TrialType;
+BehavType       = data.Par.BehavType+1;
 clear data
-%section in the maze to analyze
-in              = 'mid_arm';
-out             = 'lat_arm';
-debug           = false;
-namevar         = 'run';
-%segmentation and filtering of silent neurons
-bin_size_s      = 0.04; %seconds
-min_firing      = 1.0; %minimium firing rate
-filterTrails    = false; % filter trails with irregular speed/spike count?
-% GPFA trainign
-n_folds         = 3;
-zDim            = 10; %latent dimension
+% String descriptions
+Typetrial_tx    = {'left', 'right', 'errorLeft', 'errorRight'};
+Typebehav_tx    = {'first', 'regular', 'uncertain'};
+Typeside_tx     = {'left', 'right', 'right', 'left'};
+% GPFA training
 showpred        = false; %show predicted firing rate
-train_split      = true; %train GPFA on left/right separately?
-name_save_file  = '_trainedGPFA_run.mat';
+train_split     = true; %train GPFA on left/right separately?
+name_save_file  = 'trainedGPFA';
 test_lap        = 10;
-maxTime         = 0; %maximum segmentation time 0 if use all
+trained         = false;
 
+
+project         = strrep(roots{settings.animal},'/','');
+savepath        = [workpath roots{settings.animal}];
+fn              = [project '_' name_save_file '_' settings.namevar '.mat'];
+if ~exist(savepath,'dir')
+    mkdir(savepath);
+end
+
+    
+%%
 % ========================================================================%
 %==============   (1) Extract trials              ========================%
 %=========================================================================%
 
-D = extract_laps(Fs,spk_lap,speed,X,Y,events,isIntern, laps, TrialType,...
-                 wh_speed);
+D = extract_laps(Fs, spk_clust, ~isIntern, events, ...
+                 struct('in','all','out','all'), TrialType, BehavType, ...
+                 X, Y, speed, wh_speed);
 
 %show one lap for debug purposes 
-if debug
+if settings.debug
     figure(test_lap)
     raster(D(test_lap).spikes), hold on
     plot(90.*D(test_lap).speed./max(D(test_lap).speed),'k')
@@ -73,86 +75,143 @@ end
 %==============  (2)  Extract Running Sections    ========================%
 %=========================================================================%
 
-S = get_section(D, in, out, debug, namevar); %lap#1: sensor errors 
+%lap#1: sensor errors
+S = extract_laps(Fs, spk_clust, ~isIntern, events, ...
+                settings.section, TrialType, BehavType, ...
+                X, Y, speed, wh_speed);
 
 % ========================================================================%
 %============== (3) Segment the spike vectors     ========================%
 %=========================================================================%
 %load run model and keep the same neurons
-% run = load([roots{animal} '_branch2_results40ms.mat']);
+if isCommandWindowOpen() && exist([savepath fn],'file')
+    fprintf('Will load from %s\n', [savepath fn]);
+    info = load([savepath fn], 'M', 'laps', 'R', 'keep_neurons', 'settings');
+    keep_neurons = info.keep_neurons;
+    fprintf('Successfully loaded file, you may skip Section (4).\n');
+else
+    keep_neurons = 1;
+end
+    
+[R,keep_neurons]       = segment(S, 'spike_train', settings.bin_size, Fs, ...
+                                 keep_neurons, settings.min_firing, settings.maxTime);
 
-[R,keep_neurons]    = segment(S, bin_size_s, Fs, min_firing,...
-                              [namevar '_spike_train'], maxTime);
+laps.all               = select_laps(BehavType, TrialType, settings.namevar);
+laps.left              = select_laps(BehavType, TrialType, settings.namevar, 1);
+laps.right             = select_laps(BehavType, TrialType, settings.namevar, 2);
+
+
 %%
 % ========================================================================%
 %============== (4)         Train GPFA            ========================%
 %=========================================================================%
-M                 = trainGPFA(R, zDim, showpred, n_folds);
+try
+    M.all                  = trainGPFA(R, laps.all, settings.zDim, showpred, ...
+                                       settings.n_folds,'max_length',settings.maxLength);
 
-if train_split
-    [R_left, R_right] = split_trails(R);
-    if filterTrails
-        R_left            = filter_laps(R_left);
-        R_right           = filter_laps(R_right,'bins');
+    if train_split
+        if settings.filterTrails
+            keep_laps      = filter_laps(R(laps.left));
+            laps.left      = laps.left(keep_laps);
+            keep_laps      = filter_laps(R(laps.right),'bins');
+            laps.right     = laps.right(keep_laps);
+        end
+
+        M.left             = trainGPFA(R, laps.left, settings.zDim, showpred, ...
+                                       settings.n_folds,'max_length',settings.maxLength);
+        M.right            = trainGPFA(R, laps.right, settings.zDim, showpred, ...
+                                       settings.n_folds,'max_length',settings.maxLength);
     end
-
-    M_left            = trainGPFA(R_left, zDim, showpred, n_folds);
-    M_right           = trainGPFA(R_right, zDim, showpred, n_folds);
+    trained = true;
+catch ME
+    fprintf('Error training GPFA: %s\n', ME.identifier);
+    rethrow(ME);
 end
 
 %%
 % ========================================================================%
-%============== (5)    Show Neural Trajectories   ========================%
+%============== (5)    Save / Use saved data      ========================%
 %=========================================================================%
 
-colors = [1 0 0; 0 0 1; 0.1 0.1 0.1; 0.1 0.1 0.1];
-Xorth = show_latent({M},R,colors);
+if trained
+    fprintf('Will save at %s\n', [savepath fn]);
+    save([savepath fn], 'M', 'laps', 'R', 'keep_neurons', 'settings');
+    trained = false; %#ok<NASGU>
+    exit;
+else
+    M = info.M; %#ok<UNRCH>
+end
 
-%======================================================================== %
-%============== (6)    Save data                  ========================%
+
+%%
+% ========================================================================%
+%============== (6)    Show Neural Trajectories   ========================%
 %=========================================================================%
-fprintf('Will save at %s\n',[roots{animal} name_save_file])
-save([roots{animal} name_save_file],'M','M_left','M_right','R', 'keep_neurons')
+
+%colors = cgergo.cExpon([2 3 1], :);
+colors = hsv(4);
+labels = [R.type];
+Xorth = show_latent({M.all}, R, colors, labels, Typetrial_tx);
+
 %%
 %=========================================================================%
 %=========(7) Compare mean spike counts              =====================%
 %=========================================================================%
 figure(7)
 set(gcf,'position',[100 100 500*1.62 500],'color','w')
-plot(mean([R_left.y],2),'r','displayname','wheel after left')
+plot(mean([R(laps.left).y],2),'r','displayname','wheel after left')
 hold on
-plot(mean([R_right.y],2),'b','displayname','wheel after right')
+plot(mean([R(laps.right).y],2),'b','displayname','wheel after right')
 ylabel('Average firing rate')
 xlabel('Cell No.')
 set(gca,'fontsize',14)
-savefig()     
+savefig()
+
+figure(71)
+plot_timescales({M.left, M.right, M.all}, colors, {'trained_{left}', 'trained_{right}', 'trained_{all}'})
+
+%%
 %=========================================================================%
 %=========(8) Compute loglike P(run|model_run)       =====================%
 %=========================================================================%
 
-load([roots{animal} name_save_file])
-R           = shufftime(R);
+%load([roots{settings.animal} name_save_file])
+Rs           = R;
+%Rs           = shufftime(R);
+%Rs           = shuffspike(R);
+[Rs, Malt.left, Malt.right, Malt.all] = normalizedatanmodel(Rs, M.left, M.right, M.all);
+%sufficient: 1:4 or 12:16 or 21:22 or 23:24 or 25:30? OR 31:35
+%inconclusive: 5:10 and 17:18 and
+%spy = [1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 20 21 22 23 24 25 26 27 28 29 30 36 37 38 39 40 41 42 43 44 45 46];
+%for l = 1:length(Rs)
+%    Rs(l).y(spy,:)=0;
+%end
 %Classification stats of P(run events|model) 
-models      = {M_left, M_right};
-Xtats       = classGPFA(R, models);
+models      = {M.left, M.right};
+models      = {Malt.left, Malt.right};
+Xtats       = classGPFA(Rs, models);
 cm          = [Xtats.conf_matrix];
 fprintf('hitA: %2.2f%%, hitB: %2.2f%%\n', 100*cm(1,1),100*cm(2,2))
 
-%show likelihood given the models
-% plot show likelihood given the models
+% %show likelihood given the models
+% % plot show likelihood given the models
 label.title = 'P(run_j | Models_{left run, right run})';
 label.modelA = 'Left alt.';
 label.modelB = 'Right alt.';
+%label.modelB = 'Global model';
 label.xaxis = 'j';
 label.yaxis = 'P(run_j| Models_{left run, right run})';
-compareLogLike(R, Xtats, label)
+compareLogLike(Rs, Xtats, label)
 
 %XY plot
+cgergo = load('colors');
+
 label.title = 'LDA classifier';
 label.xaxis = 'P(run_j|Model_{left run})';
 label.yaxis = 'P(run_j|Model_{right run})';
-LDAclass(Xtats, label)
+LDAclass(Xtats, label, cgergo.cExpon([2 3], :))
 
+%%
 %=========================================================================%
 %=========(9) Compute loglike P(wheel|run_model)     =====================%
 %=========================================================================%
@@ -165,7 +224,7 @@ allTrials       = true; %use all trials of running to test since they are
                         %all unseen to the wheel model
 
 S = get_section(D, in, out, debug, namevar); %lap#1: sensor errors 
-W = segment(S, bin_size_s, Fs, keep_neurons,...
+W = segment(S, bin_size, Fs, keep_neurons,...
                 [namevar '_spike_train'], maxTime);
 W = filter_laps(W);
 W = W(randperm(length(W))); 
@@ -187,4 +246,4 @@ compareLogLike(R, Xtats, label)
 label.title = 'Class. with Fisher Disc.';
 label.xaxis = 'P(wheel_j|run right)';
 label.yaxis = 'P(wheel_j|run left)';
-LDAclass(Xtats, label)     
+LDAclass(Xtats, label)

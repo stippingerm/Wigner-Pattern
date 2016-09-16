@@ -7,20 +7,21 @@ function [gpfa_params, gpfa_traj, LL] = gpfa_mod(D,dims,varargin)
 %   emMaxIters (optional) --- number of iterations GPFA will go to
 %   wb (optional) --- updates waitbar
 %   binWidth (optional, default:20) --- if you want to change binWidth
-%
+%  Copyright Benjamin Cowley, Matthew Kaufman, Zachary Butler, Byron Yu,
+%  John Cunningham, 2012-2013
+
 % ---GNU General Public License Copyright---
-% This file is a modified version of gpfa_engineDH.m inside DataHigh.
+% This file is a modified version of gpfa_engineHD.m inside DataHigh.
 % 
 % DataHigh is free software: you can redistribute it and/or modify
 % it under the terms of the GNU General Public License as published by
 % the Free Software Foundation, version 2.
 % 
-%  Copyright Benjamin Cowley, Matthew Kaufman, Zachary Butler, Byron Yu,
-%  John Cunningham, 2012-2013
+% 
 
 startup_gpfa;  % run the script to set up MEX environment
 emMaxIters      = 200;  % shown to work for most cases
-bin_width_sam   = 25; % 20ms at 1250 Hz in samples
+bin_size_ms     = 25; % 20ms at 1250 Hz in samples
 extra_opts      = assignopts(who,varargin);
 
 % Set maxIters option
@@ -42,7 +43,7 @@ startEps      = 1e-3;
 startParams.covType = 'rbf';
 % GP timescale
 % Assume binWidth is the time step size. tau = bin_size_ms/sqrt(gamma)
-startParams.gamma = (bin_width_sam / startTau)^2 * ones(1, dims);
+startParams.gamma = (bin_size_ms / startTau)^2 * ones(1, dims);
 % GP noise variance
 startParams.eps   = startEps * ones(1, dims);
 

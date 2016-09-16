@@ -18,25 +18,30 @@ function Xtats = classGPFA(P, models, varargin)
 %
 %
 %Version 1.0 Ruben Pinzon@2015
-folds        = length(models{1}.params);
+scaleK       = 1.0;
+scaleRate    = 1.0;
+scaleVar     = 1.0;
+
 useAllTrials = false;
-scale = false;
-if nargin == 3
-   scaleK = varargin{1}; 
-   if ~isempty(scaleK)
-    scale  = true;   
-    fprintf('Scaling the GP Kernel with %2.2f\n',scaleK)
-   end
-elseif nargin == 4
-   useAllTrials = true;
-   disp('Warning: Using all the trials for testing')
+mergeTrials  = false;
+assignopts(who,varargin);
+
+folds        = length(models{1}.params);
+scale        = (scaleK ~= 1.0) || (scaleRate ~= 1.0) || (scaleVar ~= 1.0);
+if scale
+    fprintf('Scaling the GP Kernel with %2.2f, rates with %2.2f\n',scaleK, scaleRate);
+end
+if useAllTrials
+    disp('Warning: Using all the trials for testing');
 end
 
 n_laps      = length(P);
 v_laps      = [P.trialId];
 model_like  = zeros(length(models), n_laps);
+model_tol   = zeros(length(models), n_laps);
     
 for m = 1 : length(models)
+    %likelikehood   = -Inf*ones(folds, n_laps);
     likelikehood   = nan(folds, n_laps);
 
     for ifold = 1 : folds
@@ -46,31 +51,44 @@ for m = 1 : length(models)
             usedlaps    = models{m}.trainTrials{ifold};
             unseenP     = ones(1,n_laps);
             for u = 1 : length(usedlaps)
+                %u_idx = find(v_laps == usedlaps(u));
+                %unseenP(u_idx) = 0;
                 unseenP(v_laps == usedlaps(u)) = 0;
             end
             unseenP = find(unseenP ==1);
         else
             unseenP = 1:n_laps;
         end
-        
-        for p = 1 : length(unseenP) 
-        
-            %select the model parameters from the fold#1 
-            model = models{m}.params{ifold};
-            lap   = unseenP(p);
-            %rescale time scale of the GP if needed.
-            if scale
-               model.gamma = model.gamma * scaleK;
-            end
-            
-            [traj, ll] = exactInferenceWithLL(P(lap), model,'getLL',1);        
-            likelikehood(ifold,lap) = ll / P(lap).T;                  
 
-        end       
-        %remove trials used during training
+        %select the model parameters from the fold#1 
+        model = models{m}.params{ifold};
+        %rescale time scale of the GP if needed.
+        if scale
+           model.gamma = model.gamma .* (scaleK .^ 2);
+           model.d = model.d .* sqrt(scaleRate);
+           model.C = model.C .* sqrt(scaleRate);
+           model.R = model.R .* sqrt(scaleVar);
+        end
+        
+        if ~mergeTrials
+            for p = 1 : length(unseenP) 
+                lap   = unseenP(p);
+
+                [traj, ll] = exactInferenceWithLL(P(lap), model,'getLL',1);       
+                likelikehood(ifold,lap) = ll / P(lap).T;
+                %likelikehood(ifold,lap) = ll;
+            end
+        else
+            % evaluating trials together involves one inversion only for
+            % laps of same length but ll will also be identic
+            [traj, ll] = exactInferenceWithLL(P(unseenP), model,'getLL',1);
+            likelikehood(ifold,unseenP) = ll / sum([P(unseenP).T]);
+        end
     end
     
+    %model_like(m,:) = max(likelikehood);
     model_like(m,:) = nanmean(likelikehood);
+    model_tol(m,:) = (nanmax(likelikehood)-nanmin(likelikehood))/(folds-1);
 end
 
 [~, max_mod]    = max(model_like);
@@ -87,5 +105,6 @@ Xtats.conf_matrix    = [TP, FP; TN, FN];
 Xtats.class_output   = max_mod;
 Xtats.real_label     = type;
 Xtats.likelihood     = model_like;
+Xtats.tolerance      = model_tol;
 
 %fprintf('Fold %d done\n',ifold)

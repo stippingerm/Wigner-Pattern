@@ -1,4 +1,4 @@
-function D = filter_laps(D,varargin)
+function keep = filter_laps(D,varargin)
 %Filter the laps in the struct D with firing rate count below 1 s.d. of
 %       the mean of all the laps.
 %
@@ -27,5 +27,3 @@ else
 end
 
 fprintf('%d trials filter out: [%s]\n', sum(~keep), sprintf('%d ',[D(~keep).trialId]))
-
-D = D(keep);

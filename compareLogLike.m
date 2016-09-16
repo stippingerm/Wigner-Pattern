@@ -6,7 +6,8 @@ function compareLogLike(D, Xtats, label)
 figure,hold on
 set(gcf, 'color','w')
 
-plot(Xtats.likelihood','-o')
+%plot(Xtats.likelihood','-o')
+errorbar(Xtats.likelihood',Xtats.tolerance','-o')
 xlabel('Trials'), xlim([0 length(D)+1]), 
 ylabel('LogLikelihood')
 legend(label.modelA,label.modelB,...
