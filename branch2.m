@@ -20,7 +20,7 @@
 %          trajectories are shown in the orthogonalized space using the three
 %          largest principal components of SVD of the models. In (5) the effect
 %          in the latent variables of the models by changing the scale of the
-%          kernel in the GPFA is shown. (6) the SPWs identify by Attila are
+%          kernel in the GPFA is shown. (6) the SPWs identified by Attila are
 %          extracted and analyzed with the three models trained during running.
 %          The model time scale can be readjusted by using the M step in the EM
 %          learning algorithm of the GPFA to compensate for the shorter duration
