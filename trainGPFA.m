@@ -1,4 +1,4 @@
-function M = trainGPFA(D, select_laps, zDim, showpred, folds, varargin)
+function M = trainGPFA(D, select_clust, select_laps, zDim, showpred, folds, varargin)
 %TRAINGPFA trains an cross validates a gpfa model with the data in D, using given folds
 %           fields required in D: y: spike trains
 %           select_laps: the integer IDs of the laps to be included
@@ -53,10 +53,8 @@ for ifold = 1 : folds  % two-fold cross-validation
     fprintf('reserving for testing trials %s\n',sprintf('%d, ',test_trials{ifold}))
     
     %training of the GPFA
-    if max_length>0
-        train_data = reshape_laps(train_data,max_length);
-        test_data = reshape_laps(test_data,2*max_length);
-    end
+    train_data = reshape_laps(train_data,select_clust,max_length,varargin{:});
+    test_data = reshape_laps(test_data,select_clust,2*max_length,varargin{:});
     
     [params, gpfa_traj, ll_tr] = gpfa_mod(train_data,zDim);
 
@@ -97,7 +95,7 @@ M.like_test   = like;
 M.like_train  = like_tr;
 M.testTrials  = test_trials;
 M.trainTrials = train_trials;
-
+M.keep_neurons= select_clust;
 
 
 clear result params* mse like

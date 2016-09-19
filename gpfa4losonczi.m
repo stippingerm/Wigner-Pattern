@@ -1,25 +1,21 @@
-%BRANCH2_CLEANED This script contains a modularized version of the analysis
-%        included in the script branch2d.m, that process the HC-5 database.
+%GPFA4SYNTHETICDIMENSIONALITY This script reads the fitted GPFA models and
+%plots the log likelihood of the different latent dimensionality.
 %
-%        DESCRIPTION: This script carried out most of the analysis in the files
-%        branch2.m using functions. See branch2.m for further details.
+%        DESCRIPTION: This script can be used for dimesionality estimation.
 %Version 1.0 Marcell Stippinger
 
 
 clc, close all; %clear all;
+
 workpath        = '~/marcell/napwigner/work/';
 name_save_file  = 'trainedGPFA';
 
 if ~exist('settings_file','var')
-    settings_file = 'gpfa4syntheticSectionSettings.m';
+    settings_file = 'gpfa4losoncziSettings.m';
 end
 
 run(settings_file);
 
-%project         = strrep(animals{settings.animal},'.dat','');
-%savepath        = [workpath project '/'];
-%fn              = [project '_' ...
-%                   name_save_file '_' sprintf('%02d',settings.zDim) '.mat'];
 
 %========================       Source data      ==========================
 
@@ -37,47 +33,47 @@ end
 
 trained         = false;
 
-%========================Paramteres and variables==========================
-data            = dlmread(files{settings.animal},'',1,0);
-numLaps         = 12;
-Fs              = 100;
-data(:,1)       = round(data(:,1)*Fs);
-totalDuration   = max(data(:,1));
-lapDuration     = round(linspace(0,totalDuration,numLaps+1));
-events          = cell(numLaps,1);
-for n = 1:numLaps
-events{n}       = [lapDuration(n)+1 lapDuration(n+1)];
-end
-idx_lap         = cell2mat(events);
-idx_sec         = cell2mat(events);
-pos             = dlmread(strrep(files{settings.animal},'spike','pos'),'',0,0);
-try
-    state       = dlmread(strrep(files{settings.animal},'spike','state'),'',0,0);
-    SPW_X       = dlmread(strrep(files{settings.animal},'spike','posSPW'),'',0,0);
-catch ME
-    state       = zeros(totalDuration,1);
-    SPW_X       = zeros(totalDuration,size(pos,2));
-end
-pos             = [pos state SPW_X];
-n_cells         = max(data(:,2));
-allowed_clust   = ones(n_cells,1);
-spk_clust       = get_spikes(data(:,2), data(:,1));
-meta = repmat(struct('valid',true),numLaps,1);
 
-TrialType       = ones(1,numLaps);
-BehavType       = ones(1,numLaps) .* (1+1);
+
+%========================Paramteres and variables==========================
+data            = load(files{settings.animal});
+numLaps         = length(data.transients);
+Fs              = 8;
+lapDuration     = [0];
+events          = cell(1,numLaps);
+durations       = [10,20,15,5,9];
+lap_events      = cumsum([0, durations]);
+lap_events      = [Fs*lap_events(1:end-1)', Fs*lap_events(2:end)'-1];
+
+for i_lap = 1:numLaps
+    % TODO: make this more comprehensive, add transition D -> S -> R
+    D(i_lap).trialId       = i_lap; %#ok<*SAGROW>
+    D(i_lap).spikes        = [];
+    D(i_lap).pos           = [];
+    D(i_lap).events        = lap_events;
+    D(i_lap).spike_count   = data.transients{i_lap};
+    D(i_lap).spike_freq    = mean(data.transients{i_lap},2)*Fs;
+    D(i_lap).duration      = size(data.transients{i_lap},2)/Fs;
+    D(i_lap).start         = lapDuration(i_lap)/Fs;
+    D(i_lap).valid         = 1;
+    lapDuration(i_lap+1)= lapDuration(i_lap) + size(data.transients{i_lap},2);
+    events{i_lap}       = lap_events;
+end
+totalDuration   = lapDuration(end);
+pos             = zeros(totalDuration,1);
+n_cells         = length(data.rois);
+allowed_clust   = ones(n_cells,1);
 clear data
 % String descriptions
-Typetrial_tx    = {'free_run'};
-Typebehav_tx    = {'first', 'regular', 'uncertain'};
-Typeside_tx     = {'none'};
+Typetrial_tx    = {'Baseline', 'CS+', 'CS-'};
+Typebehav_tx    = {'demotivated', 'fear', 'brave'};
+Typeside_tx     = {'W+', 'W-'};
 % GPFA training
 showpred        = false; %show predicted firing rate
 test_lap        = 10;
 
 
-laps.all        = select_laps(BehavType, TrialType, settings.namevar);
-
+laps.all        = ones(numLaps,1);
 
 
 %%
@@ -85,8 +81,9 @@ laps.all        = select_laps(BehavType, TrialType, settings.namevar);
 %==============   (1) Extract trials              ========================%
 %=========================================================================%
 
-D = extract_general(Fs, settings.bin_size, spk_clust, pos, ...
-                    idx_lap, events, meta);
+%D = extract_general(Fs, settings.bin_size, spk_clust, pos, ...
+%                    idx_lap, events, meta);
+
 
 %show one lap for debug purposes 
 if settings.debug
@@ -101,10 +98,11 @@ end
 %=========================================================================%
 
 %S = get_section(D, in, out, debug, namevar); %lap#1: sensor errors
-S = extract_general(Fs, settings.bin_size, spk_clust, pos, ...
-                    idx_sec, events, meta);
+%S = extract_general(Fs, settings.bin_size, spk_clust, pos, ...
+%                    idx_sec, events, meta);
+S = D;
 
-
+                
 % ========================================================================%
 %============== (3) Segment the spike vectors     ========================%
 %=========================================================================%
@@ -126,16 +124,15 @@ if isCommandWindowOpen() && exist([savepath fn],'file') && ~settings.train
     fprintf('Successfully loaded file, you may skip Section (4).\n');
 end
 
-R = extract_general(Fs, settings.bin_size, spk_clust, pos, ...
-                    idx_sec, events, meta);
+%R = extract_general(Fs, settings.bin_size, spk_clust, pos, ...
+%                    idx_sec, events, meta);
+R = S;
 
 if settings.filterTrails
     train_laps         = filter_laps(R);
 else
     train_laps         = true;
 end
-
-%Tstate = (2*(cell2mat(Rstate')>0) - (cell2mat(Rstate') & cell2mat(Rcons')));
 
 
 %%
@@ -359,4 +356,4 @@ compareLogLike(R, Xtats, label)
 label.title = 'Class. with Fisher Disc.';
 label.xaxis = 'P(wheel_j|run right)';
 label.yaxis = 'P(wheel_j|run left)';
-LDAclass(Xtats, label)
+LDAclass(Xtats, label)     

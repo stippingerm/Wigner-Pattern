@@ -4,16 +4,19 @@
 %
 % Marcell Stippinger, 2016
 
+%directory
+settings.basepath        = '~/marcell/_Data_ubi_hpc/';
+settings.workpath        = '~/marcell/napwigner/work/';
+settings.pattern         = '(spike_.*)\.dat';
 %dataset
 settings.animal          = 28;
 %section in the maze to analyze
-settings.section.in      = 'all';
-settings.section.out     = 'all';
 settings.debug           = false;
 settings.namevar         = 'run';
 %segmentation and filtering of silent neurons
 settings.bin_size        = 0.05; %duration (s)
 settings.min_firing      = 0.1; %minimium firing rate (Hz)
+settings.median_firing   = 0.1;
 settings.filterTrails    = false; % filter trails with irregular speed/spike count?
 % GPFA training
 settings.train           = 0; %redo training
