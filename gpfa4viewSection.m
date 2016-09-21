@@ -39,24 +39,26 @@ trained         = false;
 data            = load(files{settings.animal});
 [n_cells, numLaps] = size(data.MUA);
 Fs              = 1000;
+lap_duration    = max(max([spk_clust{:}])); % s
 pos             = [];
 spk_clust       = data.MUA;
 TrialType       = num2cell(data.Cond);
 %BehavType       = num2cell(data.Par.BehavType+1);
+% this handles different paradigms
+if isfield(data,'Images')
+    % attention task
+    Stim = data.Images;
+else
+    % passive viewing
+    Stim = data.Cond;
+end
 clear data
-% String descriptions
-Typetrial_tx    = {'left', 'right', 'errorLeft', 'errorRight'};
-Typebehav_tx    = {'first', 'regular', 'uncertain'};
-Typeside_tx     = {'left', 'right', 'right', 'left'};
-% GPFA training
-showpred        = false; %show predicted firing rate
-test_lap        = 10;
 
-allowed_clust   = settings.interneuron_allowed & ones(n_cells,1);
+allowed_clust   = ones(n_cells,1);
 
 % Extract spks when the rat is running in the sections [section_range]
-idx_lap=[zeros(numLaps,1),Fs*ones(numLaps,1)];
-idx_sec=[zeros(numLaps,1),Fs*ones(numLaps,1)];
+idx_lap=[zeros(numLaps,1),lap_duration*Fs*ones(numLaps,1)];
+idx_sec=[zeros(numLaps,1),lap_duration*Fs*ones(numLaps,1)];
 meta = repmat(struct('valid',true),numLaps,1);
 [meta.type]     = TrialType{:};
 
@@ -64,8 +66,55 @@ for i_lap = 1:numLaps
     events{i_lap} = [0, 1];
 end
 
+    
+D = extract_general(Fs, 0.001, spk_clust, pos, ...
+                    idx_lap, events, meta, 'format', 'view', 'useFloats', true);
 
+n_bins = size(D(1).spike_count,2);
+raster = zeros(numLaps,n_cells,n_bins);
+for i_lap = 2:numLaps
+    raster(i_lap,1:end,1:end) = D(i_lap).spike_count;
+end
+plot(squeeze(mean(raster,1)));
+
+
+if strcmp(settings.filterParametrization,'lowRate')
+    channelFilter.maxTrialAvgTh = 0.10; % isisc369 has lower firing rates
+    channelFilter.peakFirstRatioTh = 4;
+    channelFilter.peakFirstDiffTh = 0.05;
+elseif strcmp(settings.filterParametrization,'highVariance')        
+    channelFilter.maxTrialAvgTh = 0.15;
+    channelFilter.peakFirstRatioTh = 5;
+    channelFilter.peakFirstDiffTh = 0.15;
+elseif strcmp(settings.filterParametrization,'standard')
+    channelFilter.maxTrialAvgTh = 0.15;
+    channelFilter.peakFirstRatioTh = 4.7;
+    channelFilter.peakFirstDiffTh = 0.07;
+else
+    error('Unknown filter parametrisation\n')
+end            
+
+% filterParametrization: the channel filter looks at three things: (i) the
+% maximum of the firing rate shouldn't be too low, (ii) the ratio and (iii)
+% the difference between the spontaneous activity and the transient peak
+% shouldn't be too low. There are some predefined threshold sets I worked
+% out for sessions I had, you might need to experiment with the values to
+% accept the channels that look all right to you visually
+trialAvgR = squeeze(mean(raster,1))'; % trialLength x nChannel
+maxOfTrialAvgPerChannel = max(trialAvgR); % this is the peak of the evoked transient 
+firstOfEachTrial = squeeze(raster(:,:,1)); % nTrials x nChannel    
+trialAvgOfFirstPerChannel = mean(firstOfEachTrial); % this is the beginning of the trial
+peakFirstDiff = maxOfTrialAvgPerChannel - trialAvgOfFirstPerChannel;
+peakFirstRatio = maxOfTrialAvgPerChannel ./ trialAvgOfFirstPerChannel;                        
+
+goodChannelsLogical = maxOfTrialAvgPerChannel > channelFilter.maxTrialAvgTh & ...
+                      peakFirstRatio > channelFilter.peakFirstRatioTh & ...
+                      peakFirstDiff > channelFilter.peakFirstDiffTh;
+goodChannels = find(goodChannelsLogical);
+    
+allowed_clust          = goodChannelsLogical';
 laps.all               = ones(numLaps,1);
+
 
 %%
 % ========================================================================%
@@ -113,7 +162,7 @@ if isCommandWindowOpen() && exist([savepath fn],'file') && ~settings.train
 end
     
 R = extract_general(Fs, settings.bin_size, spk_clust, pos, ...
-                    idx_sec, events, meta);
+                    idx_sec, events, meta, 'format', 'view', 'useFloats', true);
 
 if settings.filterTrails
     train_laps         = filter_laps(R);
@@ -133,8 +182,9 @@ try
     fields             = fieldnames(laps);
     for i_model = 1:numel(laps)
         field          = fields{i_model};
+        fprintf('%s\n',field);
         M.(field)      = trainGPFA(R, keep_neurons, train_laps & laps.(field), ...
-                                   settings.zDim, showpred, settings.n_folds, ...
+                                   settings.zDim, settings.showpred, settings.n_folds, ...
                                    'max_length',settings.maxLength,...
                                    'spike_field','spike_count');
     end
@@ -154,7 +204,9 @@ if trained
     fprintf('Will save at %s\n', [savepath fn]);
     save([savepath fn], 'M', 'laps', 'R', 'keep_neurons', 'settings');
     trained = false; %#ok<NASGU>
-    exit;
+    if isCommandWindowOpen
+        exit;
+    end
 else
     M = info.M; %#ok<UNRCH>
 end

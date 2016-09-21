@@ -11,6 +11,7 @@ settings.pattern         = '(spike_.*)\.dat';
 %dataset
 settings.animal          = 28;
 %section in the maze to analyze
+settings.n_trials        = 12;
 settings.debug           = false;
 settings.namevar         = 'run';
 %segmentation and filtering of silent neurons
@@ -19,6 +20,8 @@ settings.min_firing      = 0.1; %minimium firing rate (Hz)
 settings.median_firing   = 0.1;
 settings.filterTrails    = false; % filter trails with irregular speed/spike count?
 % GPFA training
+settings.showpred        = false; %show predicted firing rate
+settings.test_trial      = 10;
 settings.train           = 0; %redo training
 settings.n_folds         = 3; %CV folds
 settings.zDim            = 3; %latent dimension
