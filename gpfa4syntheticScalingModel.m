@@ -20,13 +20,13 @@ workpath        = '~/marcell/napwigner/work/';
 fprintf('\nSelecting %d: %s\n\n',settings.animal,files{settings.animal});
 data            = dlmread(files{settings.animal},'',1,0);
 %mazesect        = data.Laps.MazeSection;
-numLaps         = 12;
+nLaps         = 12;
 Fs              = 100;
 data(:,1)       = round(data(:,1)*Fs);
 totalDuration   = max(data(:,1));
-lapDuration     = round(linspace(0,totalDuration,numLaps+1));
-events          = cell(1,numLaps);
-for n = 1:numLaps
+lapDuration     = round(linspace(0,totalDuration,nLaps+1));
+events          = cell(1,nLaps);
+for n = 1:nLaps
 events{n}(:,1)  = ones(13,1)*lapDuration(n)+1;
 events{n}(:,2)  = ones(13,1)*lapDuration(n+1);
 end
@@ -42,12 +42,12 @@ end
 %eeg             = data.Track.eeg;
 speed           = zeros(totalDuration,1);
 wh_speed        = ones(totalDuration,1);
-n_cells         = max(data(:,2));
-isIntern        = zeros(n_cells,1);
+nChannels         = max(data(:,2));
+isIntern        = zeros(nChannels,1);
 spk_clust       = get_spikes(data(:,2), data(:,1));
 n_pyrs          = sum(isIntern==0);
-TrialType       = ones(1,numLaps);
-BehavType       = ones(1,numLaps) .* (1+1);
+TrialType       = ones(1,nLaps);
+BehavType       = ones(1,nLaps) .* (1+1);
 clear data
 % String descriptions
 Typetrial_tx    = {'free_run'};
@@ -57,7 +57,7 @@ Typeside_tx     = {'none'};
 showpred        = false; %show predicted firing rate
 train_split     = false; %train GPFA on left/right separately?
 name_save_file  = 'trainedGPFA';
-test_lap        = 10;
+testTrial        = 10;
 trained         = false;
 
 
@@ -87,10 +87,10 @@ D = extract_laps(Fs, spk_clust, ~isIntern, events, ...
 
 %show one lap for debug purposes 
 if settings.debug
-    figure(test_lap)
-    raster(D(test_lap).spikes), hold on
-    plot(90.*D(test_lap).speed./max(D(test_lap).speed),'k')
-    plot(90.*D(test_lap).wh_speed./max(D(test_lap).wh_speed),'r')
+    figure(testTrial)
+    raster(D(testTrial).spikes), hold on
+    plot(90.*D(testTrial).speed./max(D(testTrial).speed),'k')
+    plot(90.*D(testTrial).wh_speed./max(D(testTrial).wh_speed),'r')
 end
 
 % ========================================================================%
@@ -108,11 +108,11 @@ end
 %load run model and keep the same neurons
 
 fprintf('Will load from %s\n', [savepath_run fn_run]);
-info = load([savepath_run fn_run], 'M', 'laps', 'R', 'keep_neurons', 'settings');
-keep_neurons = info.keep_neurons;
+info = load([savepath_run fn_run], 'M', 'laps', 'R', 'gpfaChannels', 'settings');
+gpfaChannels = info.gpfaChannels;
 
-[R, keep_neurons, Rstate, RSPW_X] = segment(S, 'spike_train', settings.bin_size, Fs, ...
-                                 keep_neurons, settings.min_firing, settings.maxTime, ...
+[R, gpfaChannels, Rstate, RSPW_X] = segment(S, 'spike_train', settings.bin_size, Fs, ...
+                                 gpfaChannels, settings.minFiringRate, settings.maxTime, ...
                                  Sstate, SSPW_X);
 
 laps.all               = select_laps(BehavType, TrialType, settings.namevar);

@@ -1,129 +1,79 @@
-%BRANCH2_CLEANED This script contains a modularized version of the analysis
-%        included in the script branch2d.m, that process the HC-5 database.
+%GPFA4SCALING This script loads data for a given session (see GPFA4BATCH)
+%        and also a model fitted to a (possibly) different session. Then
+%        the parameters of the model are rescaled to show how much it can
+%        account for the data and which is the best rescaling.
 %
-%        DESCRIPTION: This script carried out most of the analysis in the files
-%        branch2.m using functions. See branch2.m for further details.
-%Version 1.0 Marcell Stippinger
+%        DESCRIPTION: This script uses a settings file (see template) to
+%        set the parameters for the database and the GPFA model. It first
+%        discovers all available data files then loads the selected one
+%        using the database-specific function given in the settings. Then
+%        it loads a previously fitted GPFA model and tries to different
+%        adjustments.
+%
+%Version 1.0 Marcell Stippinger, 2016.
 
 
 clc, close all; %clear all;
-run('gpfa4syntheticSectionSettings.m');
 
-basepath        = '~/marcell/_Data_ubi_hpc/';
 workpath        = '~/marcell/napwigner/work/';
-[files, roots, animals] = get_matFiles(basepath,'spike_.*\.dat');
+name_save_file  = 'trainedGPFA';
+
+if ~exist('settings_file','var')
+    settings_file = 'gpfa4syntheticSectionSettings.m';
+end
 
 %Use settings.animal corresponding to Data/spike_SPW_D2_L4.dat
 %e.g. settings.animal = 28;
 
-%========================Paramteres and variables==========================
-fprintf('\nSelecting %d: %s\n\n',settings.animal,files{settings.animal});
-data            = dlmread(files{settings.animal},'',1,0);
-%mazesect        = data.Laps.MazeSection;
-numLaps         = 12;
-Fs              = 100;
-data(:,1)       = round(data(:,1)*Fs);
-totalDuration   = max(data(:,1));
-lapDuration     = round(linspace(0,totalDuration,numLaps+1));
-events          = cell(1,numLaps);
-for n = 1:numLaps
-events{n}(:,1)  = ones(13,1)*lapDuration(n)+1;
-events{n}(:,2)  = ones(13,1)*lapDuration(n+1);
-end
-X               = dlmread(strrep(files{settings.animal},'spike','pos'),'',0,0);
-Y               = zeros(totalDuration,size(X,2));
-try
-    state       = dlmread(strrep(files{settings.animal},'spike','state'),'',0,0);
-    SPW_X       = dlmread(strrep(files{settings.animal},'spike','posSPW'),'',0,0);
-catch ME
-    state       = zeros(totalDuration,1);
-    SPW_X       = zeros(totalDuration,size(X,2));
-end
-%eeg             = data.Track.eeg;
-speed           = zeros(totalDuration,1);
-wh_speed        = ones(totalDuration,1);
-n_cells         = max(data(:,2));
-isIntern        = zeros(n_cells,1);
-spk_clust       = get_spikes(data(:,2), data(:,1));
-n_pyrs          = sum(isIntern==0);
-TrialType       = ones(1,numLaps);
-BehavType       = ones(1,numLaps) .* (1+1);
-clear data
 % String descriptions
 Typetrial_tx    = {'free_run'};
 Typebehav_tx    = {'first', 'regular', 'uncertain'};
 Typeside_tx     = {'none'};
-% GPFA training
-showpred        = false; %show predicted firing rate
-train_split     = false; %train GPFA on left/right separately?
-name_save_file  = 'trainedGPFA';
-test_lap        = 10;
-trained         = false;
+
+run(settings_file);
 
 
-project_spw     = strrep(animals{settings.animal},'.dat','');
-project_run     = strrep(project_spw,'SPW','RUN');
-savepath_spw    = [workpath project_spw '/'];
-savepath_run    = [workpath project_run '/'];
-fn_spw          = [project_spw '_' ...
-                   name_save_file '_' sprintf('%02d',settings.zDim) '.mat'];
-fn_run          = strrep(fn_spw,'SPW','RUN');
-if ~exist(savepath_spw,'dir')
-    mkdir(savepath_spw);
+%========================       Source data      ==========================
+
+[files, roots, animals] = get_matFiles(settings.basepath,settings.pattern);
+fprintf('\nSelecting %d: %s\n\n',settings.animal,files{settings.animal});
+
+project_data   = regexprep(animals{settings.animal},settings.pattern,'$1');
+project_model  = regexprep(animals{settings.amodel},settings.pattern,'$1');
+savepath_data  = [workpath project_data '/'];
+savepath_model = [workpath project_model '/'];
+fn_data        = [project_data '_' ...
+                 name_save_file '_' settings.namevar '_' ...
+                 sprintf('%02d',settings.zDim) '.mat'];
+fn_model       = [project_model '_' ...
+                 name_save_file '_' settings.namevar '_' ...
+                 sprintf('%02d',settings.zDim) '.mat'];
+
+if ~exist(savepath_data,'dir')
+    mkdir(savepath_data);
 end
 
-if isempty(strfind(fn_spw, 'SPW'))
-    warning('A sharp wave file is requested');
-end
+
+%========================Paramteres and variables==========================
+loader = str2func(sprintf('load_%s',settings.paradigm));
+[D, inChannels, modelTrials] = loader(files{settings.animal}, settings);
+
 
 %%
 % ========================================================================%
-%==============   (1) Extract trials              ========================%
+%============== (5)    Save / Use saved data      ========================%
 %=========================================================================%
 
-D = extract_laps(Fs, spk_clust, ~isIntern, events, ...
-                 struct('in','all','out','all'), TrialType, BehavType, ...
-                 X, Y, speed, wh_speed);
+% GPFA training
 
-%show one lap for debug purposes 
-if settings.debug
-    figure(test_lap)
-    raster(D(test_lap).spikes), hold on
-    plot(90.*D(test_lap).speed./max(D(test_lap).speed),'k')
-    plot(90.*D(test_lap).wh_speed./max(D(test_lap).wh_speed),'r')
-end
-
-% ========================================================================%
-%==============  (2)  Extract Running Sections    ========================%
-%=========================================================================%
-
-%S = get_section(D, in, out, debug, namevar); %lap#1: sensor errors
-[S, Sstate, SSPW_X] = extract_laps(Fs, spk_clust, ~isIntern, events, ...
-                settings.section, TrialType, BehavType, ...
-                X, Y, speed, wh_speed, state, SPW_X);
-
-% ========================================================================%
-%============== (3) Segment the spike vectors     ========================%
-%=========================================================================%
-%load run model and keep the same neurons
-
-fprintf('Will load from %s\n', [savepath_run fn_run]);
-info = load([savepath_run fn_run], 'M', 'laps', 'R', 'keep_neurons', 'settings');
-keep_neurons = info.keep_neurons;
-
-[R, keep_neurons, Rstate, RSPW_X] = segment(S, 'spike_train', settings.bin_size, Fs, ...
-                                 keep_neurons, settings.min_firing, settings.maxTime, ...
-                                 Sstate, SSPW_X);
-
-laps.all               = select_laps(BehavType, TrialType, settings.namevar);
-laps.left              = select_laps(BehavType, TrialType, settings.namevar, 1);
-laps.right             = select_laps(BehavType, TrialType, settings.namevar, 2);
-
-
+fprintf('Will load model from %s\n', [savepath_model fn_model]);
+info = load([savepath_model fn_model], 'M', 'laps', 'R', 'inChannels', 'settings');
+%inChannels = info.inChannels;
 M = info.M;
 
+
 %% =======================================================================%
-%=========(8) Compute loglike P(run|model_run)       =====================%
+%=========(8) Compute loglike P(run|model_model)       =====================%
 %=========================================================================%
 
 %load([roots{settings.animal} name_save_file])
@@ -162,9 +112,9 @@ for k = 1 : length(scaleK)
     end
 end
 [LLgridX, LLgridY] = meshgrid(scaleRate, scaleK);
-fn_sav          = [project_run '_' 'DataScalingStudy' '_' settings.namevar '.mat'];
+fn_sav          = [project_model '_' 'DataScalingStudy' '_' settings.namevar '.mat'];
 
-save([savepath_run fn_sav],'LLcmp','LLsurf','LLgridX','LLgridY');
+save([savepath_model fn_sav],'LLcmp','LLsurf','LLgridX','LLgridY');
 
 fig = figure();
 surf(LLgridX,LLgridY,LLsurf);
@@ -173,7 +123,7 @@ suf = '';
 xlabel('scale Firing Rate');
 ylabel('scale Latent Speed');
 zlabel('log Likelihood');
-fig_export(fig, [savepath_run strrep(fn_sav,'.mat','') suf], 120, 90);
+fig_export(fig, [savepath_model strrep(fn_sav,'.mat','') suf], 120, 90);
 
 set(ax1,'View',[45, 30]); suf = '_3Da'; %run
 set(ax1,'View',[-45, 30]); suf = '_3D'; %spw

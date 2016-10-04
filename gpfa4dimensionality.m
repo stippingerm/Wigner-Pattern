@@ -6,27 +6,37 @@
 
 
 clc, close all; %clear all;
-run('gpfa4syntheticSectionSettings.m');
 
 %========================Paramteres and variables==========================
 
-basepath        = '~/marcell/_Data_ubi_hpc/';
-workpath        = '~/marcell/napwigner/work/';
-[files, roots, animals] = get_matFiles(basepath,'spike_.*\.dat');
-name_save_file  = 'trainedGPFA';
 
 maxdim = 30;
+
+
+workpath        = '~/marcell/napwigner/work/';
+name_save_file  = 'trainedGPFA';
+
+if ~exist('settings_file','var')
+    settings_file = 'gpfa4viewSectionSettings.m';
+end
+
+run(settings_file);
+
+%========================       Source data      ==========================
+
+[files, roots, animals] = get_matFiles(settings.basepath,settings.pattern);
+fprintf('\nSelecting %d: %s\n\n',settings.animal,files{settings.animal});
 
 %%
 % ========================================================================%
 %============== (2)  Load / Save data per project  =======================%
 %=========================================================================%
 
-for ianimal = 1:length(animals)
+for i_animal = 1:length(animals)
 
-    fprintf('\nSelecting %d: %s\n\n',ianimal,files{ianimal});
+    fprintf('\nSelecting %d: %s\n\n',i_animal,files{i_animal});
 
-    project         = strrep(animals{ianimal},'.dat','');
+    project         = regexprep(animals{i_animal},settings.pattern,'$1');
     savepath        = [workpath project '/'];
 
 
@@ -36,8 +46,9 @@ for ianimal = 1:length(animals)
     legend_ = cell(maxdim,1);
 
     for zDim = 1:maxdim
-        fn          = [project '_' ...
-                       name_save_file '_' sprintf('%02d',zDim) '.mat'];
+        fn              = [project '_' ...
+                           name_save_file '_' settings.namevar '_' ...
+                           sprintf('%02d',zDim) '.mat'];
 
         fprintf('Will load from %s\n', fn);
         try
@@ -51,10 +62,10 @@ for ianimal = 1:length(animals)
             like_train{zDim} = sum(cell2mat(M{zDim}.like_train'),1);
             like_test{zDim} = sum(M{zDim}.like_test,2);
             % alternative to sum: nanmean
-        catch
-            like_train{zDim} = nan(1,200); %sum(nan(max_iter,settings.n_folds),1);
+        catch ME
+            like_train{zDim} = nan(1,200); %sum(nan(max_iter,settings.nFolds),1);
             like_test{zDim} = nan;
-            disp('file not found');
+            fprintf('file not found: %s', ME.message);
         end
         legend_{zDim} = sprintf('%02d', zDim);
     end
@@ -62,8 +73,13 @@ for ianimal = 1:length(animals)
     like_train = cell2mat(like_train); %#ok<NASGU>
     like_test = cell2mat(like_test); %#ok<NASGU>
     fn              = [project '_' ...
-                       name_save_file '_' 'dim' '.mat'];
-    save([savepath fn], 'like_train', 'like_test', 'legend_');
+                       name_save_file '_' settings.namevar '_' ...
+                       'dim' '.mat'];
+    try
+        save([savepath fn], 'like_train', 'like_test', 'legend_');
+    catch ME
+        disp('project not found: %s', EM.message);
+    end
 
 end
 
@@ -74,18 +90,17 @@ end
 %=========================================================================%
 
 
-name_save_file  = 'trainedGPFA';
-
 like_train = {};
 like_test = {};
 legend_ = {};
 
-for ianimal = 1:length(files)
-    project         = strrep(animals{ianimal},'.dat','');
+for i_animal = 1:length(files)
+    project         = regexprep(animals{i_animal},settings.pattern,'$1');
     savepath        = [workpath project '/'];
 
     fn              = [project '_' ...
-                       name_save_file '_' 'dim' '.mat'];
+                       name_save_file '_' settings.namevar '_' ...
+                       'dim' '.mat'];
 
     fprintf('Will load from %s\n', fn);
     try
@@ -93,7 +108,7 @@ for ianimal = 1:length(files)
         like_train{end+1} = tmp.like_train(:,end); %#ok<SAGROW>
         like_test{end+1} = tmp.like_test(:,end); %#ok<SAGROW>
         
-        legend_{end+1} = animals{ianimal}; %#ok<SAGROW>
+        legend_{end+1} = project; %#ok<SAGROW>
     catch EM
         fprintf('file not found: %s', EM.message);
     end
@@ -106,7 +121,8 @@ end
 %=========================================================================%
 
 
-fign = sprintf('ubi_hpc_all');
+fign = sprintf('%s_all',settings.paradigm);
+%plot(bsxfun(@minus,cell2mat(like_test),nanmean(cell2mat(like_test),1)),'-');
 plot(cell2mat(like_test),'-');
 legend(legend_{:},'Location','southeast');
 xlabel('#latent dimensions for GPFA');
@@ -117,19 +133,23 @@ saveas(gcf,[fign '.pdf'],'pdf');
 
 %======================== Plot per synthetic dim ==========================
 
-files_per_dim = 5;
-synthetic_dim = 5;
-offset = 2;
+if strcmp(settings.paradigm,'viewing')
+    files_per_dim = 6;
+    offset = 1;
+else
+    files_per_dim = 5;
+    offset = 2;
+end
 
-for idim = 1:synthetic_dim
-    fign = sprintf('ubi_hpc_%d',idim);
-    start = files_per_dim*(idim-1)+offset;
-    data = cell2mat(like_test(start:start+files_per_dim-1));
+for idim = offset:files_per_dim:length(files)
+    fdim = min((idim+files_per_dim-1),length(files));
+    fign = sprintf('%s_%d',settings.paradigm,idim);
+    data = cell2mat(like_test(idim:fdim));
     idx = ~isnan(data(:,1));
-    plot(find(idx),data(idx,:),'-');
-    legend(legend_(start:start+files_per_dim-1),'Location','southeast');
+    plot(find(idx),normalize(data(idx,:),1),'-');
+    legend(legend_(idim:fdim),'Location','southeast');
     xlabel('#latent dimensions for GPFA');
-    ylabel('cross-validated log likelihood');
+    ylabel('cross-validated log likelihood (arbitrary scale)');
     xlim([0,21]);
     savefig([fign '.fig']);
     saveas(gcf,[fign '.png'],'png');
