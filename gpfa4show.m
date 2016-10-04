@@ -11,7 +11,7 @@
 %Version 1.0 Marcell Stippinger, 2016.
 
 
-clc, close all; %clear all;
+clc, close all; %clear all
 
 workpath        = '~/marcell/napwigner/work/';
 name_save_file  = 'trainedGPFA';
@@ -65,7 +65,7 @@ M = info.M;
 %colors = cgergo.cExpon([2 3 1], :);
 colors = hsv(numel(fieldnames(M)));
 labels = [D.type];
-Xorth = show_latent(M, D, colors, labels, ['Type']);
+Xorth = show_latent(struct2cell(M), D, colors, labels, ['Type']);
 
 %%
 %=========================================================================%
@@ -107,15 +107,21 @@ models             = info.decoder;
 %models      = {M.left, M.right};
 %models      = {Malt.left, Malt.right};
 Xtats       = classGPFA(Rs, models);
+Xtats       = classGPFAimproved(Rs, models);
 cm          = [Xtats.conf_matrix];
 fprintf('hitA: %2.2f%%, hitB: %2.2f%%\n', 100*cm(1,1),100*cm(2,2))
 
 Ytats = Xtats;
-Ytats.class_output = Xtats.class_output-1;
+for i = 1:length(Xtats)
+    Ytats.class_output(i) = models{Xtats.class_output(i)}.prediction;
+end
 % %show likelihood given the models
 % % plot show likelihood given the models
 label.title = 'Classification using trial likelihood according to models';
-label.model = fields;
+for i = 1:length(models)
+    tmp{i} = models{i}.name;
+end
+label.model = tmp;
 %label.modelB = 'Global model';
 label.xaxis = 'j';
 label.yaxis = 'P(trial_i | Model_j)';

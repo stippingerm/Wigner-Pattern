@@ -1,4 +1,4 @@
-function R = reshape_laps(D, keep_neurons, max_length, varargin)
+function [R, varargout] = reshape_laps(D, keep_neurons, max_length, varargin)
 %RESHAPE_LAPS is a utility to format spiking data for the GPFA implementation
 %    additionally it
 %    * restricts the set of available neurons
@@ -49,7 +49,7 @@ if ~isfield(D,'y')
 end
 R               = struct(D(1:0));
 n_pieces        = 0;
-
+originals       = zeros(n_pieces,1);
 
 for i_lap = 1 : n_laps
     lap_sepa    = separators{i_lap};
@@ -62,5 +62,10 @@ for i_lap = 1 : n_laps
         R(n_pieces+j).T = lap_sepa(j+1)-lap_sepa(j);
         R(n_pieces+j).y = D(i_lap).(spike_field)(keep_neurons,lap_sepa(j):lap_sepa(j+1)-1);
     end
+    originals(n_pieces+1:n_pieces+lap_pieces) = i_lap;
     n_pieces = n_pieces + lap_pieces;
+end
+
+if nargout > 1
+    varargout{1} = originals;
 end

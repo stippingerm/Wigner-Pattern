@@ -14,22 +14,26 @@ function [Xorth, Vorth] = show_latent(model, data, colors, labels, TrialType_tx,
 %pNorm = sum(abs(M).^p,1).^(1/p);  %# The p-norm of each column (define p first)
 %infNorm = max(M,[],1);            %# The infinity norm (max value) of each column
 
+
 n_models = length(model);
 fprintf('%d models provided\n',n_models);
 figure
-for m = 1 : n_models    
-    Params   = model{m}.params{1}; % fold #1
-    traj     = exactInferenceWithLL(data, Params,'getLL',0);
+
+for i_model = 1:n_models
+    params   = model{i_model}.params{1}; % fold #1
+    clust    = model{i_model}.keep_neurons;
+    tmp_data = reshape_laps(data,clust,0);
+    traj     = exactInferenceWithLL(tmp_data, params,'getLL',0);
     % the concatenation of pieces is not entirely justified (they might be
     % not adjoint, and even if they are the boundaries do not align smoothly)
-    x        = orthogonalize([traj.xsm], Params.C);     
-    Xorth{m} = x;
+    x        = orthogonalize([traj.xsm], params.C);     
+    Xorth{i_model} = x;
     v_vect   = [zeros(size(x,1),1) x(:,2:end)-x(:,1:end-1)];
     v_scalar = sqrt(sum(abs(v_vect).^2,1));
     acc_dist = cumsum([0 v_scalar]);
-    Vorth{m} = v_vect;
+    Vorth{i_model} = v_vect;
     
-    T              = [0 cumsum([traj.T])];
+    T        = [0 cumsum([traj.T])];
         
     set(gcf, 'position', [1,1,1424,973], 'color', 'w')
        

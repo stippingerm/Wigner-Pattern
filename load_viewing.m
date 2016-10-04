@@ -46,6 +46,11 @@ for i_lap = 1:nLaps
     lap_duration(i_lap) = max(spk_clust{i_lap});
     meta(i_lap).events  = [0, lap_duration(i_lap)];
 end
+max_duration = max(lap_duration);
+min_duration = min(lap_duration);
+
+lap_duration(:) = max_duration;
+
 idx_lap=[zeros(nLaps,1),lap_duration];
 idx_sec=[zeros(nLaps,1),lap_duration];
 
