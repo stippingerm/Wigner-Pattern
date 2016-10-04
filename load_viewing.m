@@ -1,81 +1,71 @@
-%BRANCH2_CLEANED This script contains a modularized version of the analysis
-%        included in the script branch2d.m, that process the HC-5 database.
-%
-%        DESCRIPTION: This script carried out most of the analysis in the files
-%        branch2.m using functions. See branch2.m for further details.
-%Version 1.0 Ruben Pinzon@2015
-
-
-clc, close all; %clear all;
-
-workpath        = '~/marcell/napwigner/work/';
-name_save_file  = 'trainedGPFA';
-
-if ~exist('settings_file','var')
-    settings_file = 'gpfa4viewSectionSettings.m';
-end
-
-run(settings_file);
-
-
-%========================       Source data      ==========================
-
-[files, roots, animals] = get_matFiles(settings.basepath,settings.pattern);
-fprintf('\nSelecting %d: %s\n\n',settings.animal,files{settings.animal});
-
-project         = regexprep(animals{settings.animal},settings.pattern,'$1');
-savepath        = [workpath project];
-fn              = [project '_' ...
-                   name_save_file '_' settings.namevar '_' ...
-                   sprintf('%02d',settings.zDim) '.mat'];
-if ~exist(savepath,'dir')
-    mkdir(savepath);
-end
-
-trained         = false;
-
+function [D, allowed_ch, model_trials] = load_viewing(fn, settings)
+% Load data from the passive viewing project and prepare it for GPFA. The
+% variables have the following fields:
+%    D is a 1 x n_trials struct:
+%       spike_count (nChannels x n_bins)
+%       start (s)
+%       duration (s)
+%       spikes (nChannels x 1) cell with spike times (s)
+%       pos (empty)
+%       events (1 x 2) lap start and end (bin_id)
 
 %========================Paramteres and variables==========================
-data            = load(files{settings.animal});
-[n_cells, numLaps] = size(data.MUA);
-Fs              = 1000;
-lap_duration    = max(max([spk_clust{:}])); % s
-pos             = [];
+data            = load(fn);
+project         = regexprep(fn,['.*/' settings.pattern],'$1');
+
+
 spk_clust       = data.MUA;
-TrialType       = num2cell(data.Cond);
-%BehavType       = num2cell(data.Par.BehavType+1);
-% this handles different paradigms
+[nChannels, nLaps] = size(data.MUA);
+Fs              = 1000;
+
+pos             = [];
+
+% handle different paradigms
 if isfield(data,'Images')
     % attention task
-    Stim = data.Images;
+    TrialType = num2cell(data.Images);
 else
     % passive viewing
-    Stim = data.Cond;
+    TrialType = num2cell(data.Cond);
 end
+
 clear data
 
-allowed_clust   = ones(n_cells,1);
-
 % Extract spks when the rat is running in the sections [section_range]
-idx_lap=[zeros(numLaps,1),lap_duration*Fs*ones(numLaps,1)];
-idx_sec=[zeros(numLaps,1),lap_duration*Fs*ones(numLaps,1)];
-meta = repmat(struct('valid',true),numLaps,1);
+lap_duration    = zeros(nLaps,1); % s
+
+meta = repmat(struct('valid',true),nLaps,1);
+codes = code_table_view();
+digits = codes.(project);
 [meta.type]     = TrialType{:};
+%mydigits        = num2cell(digits([TrialType{:}]));
+%[meta.digit]    = mydigits{:};
+[meta.digit]    = num2var(digits([TrialType{:}]));
 
-for i_lap = 1:numLaps
-    events{i_lap} = [0, 1];
+for i_lap = 1:nLaps
+    lap_duration(i_lap) = max(spk_clust{i_lap});
+    meta(i_lap).events  = [0, lap_duration(i_lap)];
+end
+idx_lap=[zeros(nLaps,1),lap_duration];
+idx_sec=[zeros(nLaps,1),lap_duration];
+
+% validate channels
+fprintf('Validate channels\n');
+D = get_binned_spikes(1, 1.0/Fs, spk_clust, pos, ...
+                      idx_lap, meta, 'format', 'split');
+
+n_bins = zeros(nLaps,1);
+for i_lap = 1:nLaps
+    n_bins(i_lap) = size(D(i_lap).spike_count,2);
 end
 
-    
-D = extract_general(Fs, 0.001, spk_clust, pos, ...
-                    idx_lap, events, meta, 'format', 'view', 'useFloats', true);
-
-n_bins = size(D(1).spike_count,2);
-raster = zeros(numLaps,n_cells,n_bins);
-for i_lap = 2:numLaps
-    raster(i_lap,1:end,1:end) = D(i_lap).spike_count;
+sraster = zeros(nLaps,nChannels,max(n_bins));
+for i_lap = 1:nLaps
+    sraster(i_lap,1:end,1:n_bins(i_lap)) = D(i_lap).spike_count;
 end
-plot(squeeze(mean(raster,1)));
+if settings.debug
+    plot(squeeze(mean(sraster,1))');
+end
 
 
 if strcmp(settings.filterParametrization,'lowRate')
@@ -100,9 +90,9 @@ end
 % shouldn't be too low. There are some predefined threshold sets I worked
 % out for sessions I had, you might need to experiment with the values to
 % accept the channels that look all right to you visually
-trialAvgR = squeeze(mean(raster,1))'; % trialLength x nChannel
+trialAvgR = squeeze(mean(sraster,1))'; % trialLength x nChannel
 maxOfTrialAvgPerChannel = max(trialAvgR); % this is the peak of the evoked transient 
-firstOfEachTrial = squeeze(raster(:,:,1)); % nTrials x nChannel    
+firstOfEachTrial = squeeze(sraster(:,:,1)); % nTrials x nChannel    
 trialAvgOfFirstPerChannel = mean(firstOfEachTrial); % this is the beginning of the trial
 peakFirstDiff = maxOfTrialAvgPerChannel - trialAvgOfFirstPerChannel;
 peakFirstRatio = maxOfTrialAvgPerChannel ./ trialAvgOfFirstPerChannel;                        
@@ -110,250 +100,60 @@ peakFirstRatio = maxOfTrialAvgPerChannel ./ trialAvgOfFirstPerChannel;
 goodChannelsLogical = maxOfTrialAvgPerChannel > channelFilter.maxTrialAvgTh & ...
                       peakFirstRatio > channelFilter.peakFirstRatioTh & ...
                       peakFirstDiff > channelFilter.peakFirstDiffTh;
-goodChannels = find(goodChannelsLogical);
-    
-allowed_clust          = goodChannelsLogical';
-laps.all               = ones(numLaps,1);
+goodChannels        = find(goodChannelsLogical);
+
+fprintf('%d ', goodChannels);
+fprintf('\n');
+
+allowed_ch          = goodChannelsLogical';
 
 
 %%
 % ========================================================================%
-%==============   (1) Extract trials              ========================%
+%==============   (1) Show trials                 ========================%
 %=========================================================================%
 
-D = extract_general(Fs, settings.bin_size, spk_clust, pos, ...
-                    idx_lap, events, meta, 'format', 'view', 'useFloats', true);
 
-%show one lap for debug purposes 
+%show one lap for debug purposes (TODO)
 if settings.debug
-    figure(test_lap)
-    raster(D(test_lap).spikes), hold on
-    plot(90.*D(test_lap).speed./max(D(test_lap).speed),'k')
-    plot(90.*D(test_lap).wh_speed./max(D(test_lap).wh_speed),'r')
+    fprintf('Show spikes\n');
+    D = get_binned_spikes(1, 1.0/Fs, spk_clust, pos, ...
+                          idx_lap, meta, 'format', 'split');
+    figure(testTrial)
+    raster(D(testTrial).spikes), hold on
+    plot(90.*D(testTrial).speed./max(D(testTrial).speed),'k')
+    plot(90.*D(testTrial).wh_speed./max(D(testTrial).wh_speed),'r')
 end
 
-% ========================================================================%
-%==============  (2)  Extract Running Sections    ========================%
-%=========================================================================%
+train_laps = true;
 
-%lap#1: sensor errors
-S = extract_general(Fs, 1.0/Fs, spk_clust, pos, ...
-                    idx_sec, events, meta, 'format', 'view', 'useFloats', true);
+fprintf('Prepare data\n');
+D = get_binned_spikes(1, settings.bin_size, spk_clust, pos, ...
+                      idx_sec, meta, 'format', 'split');
+                
+model_trials.all       = train_laps & ones(nLaps,1);
+model_digits.all       = -1;
 
-% ========================================================================%
-%============== (3) Segment the spike vectors     ========================%
-%=========================================================================%
-
-cluster.MeanFiringRate = mean([S([S.valid]).spike_freq],2);
-cluster.MedianFiringRate = median([S([S.valid]).spike_freq],2);
-
-keep_neurons = (settings.min_firing<cluster.MeanFiringRate) & ...
-    (settings.median_firing<cluster.MedianFiringRate) & ...
-    (allowed_clust);
-fprintf('%d neurons fulfil the criteria for GPFA\n',sum(keep_neurons));
-
-
-%load run model and keep the same neurons
-if isCommandWindowOpen() && exist([savepath fn],'file') && ~settings.train
-    fprintf('Will load from %s\n', [savepath fn]);
-    info = load([savepath fn], 'M', 'laps', 'R', 'keep_neurons', 'settings');
-    keep_neurons = info.keep_neurons;
-    fprintf('Successfully loaded file, you may skip Section (4).\n');
-end
-    
-R = extract_general(Fs, settings.bin_size, spk_clust, pos, ...
-                    idx_sec, events, meta, 'format', 'view', 'useFloats', true);
-
-if settings.filterTrails
-    train_laps         = filter_laps(R);
-else
-    train_laps         = true;
+% collect trials with same label
+Digits = unique([D.type]);
+%descr = repmat([],len(Digits))
+for type = Digits
+    %descr(type).type = sprintf('%02d',type);
+    name = sprintf('num%02d',type);
+    model_trials.(name) = train_laps & ([D.type]' == type);
+    model_digits.(name) = digits(type);
 end
 
-% FIXME: put keep_neurons in reshape_laps
-% also deal with field names spk_count -> y and duaration -> T
-
-%%
-% ========================================================================%
-%============== (4)         Train GPFA            ========================%
-%=========================================================================%
-try
-    clear M
-    fields             = fieldnames(laps);
-    for i_model = 1:numel(laps)
-        field          = fields{i_model};
-        fprintf('%s\n',field);
-        M.(field)      = trainGPFA(R, keep_neurons, train_laps & laps.(field), ...
-                                   settings.zDim, settings.showpred, settings.n_folds, ...
-                                   'max_length',settings.maxLength,...
-                                   'spike_field','spike_count');
+% collect trials with overrepresented symbol
+nNormalDigit = 10;
+nOverrep = 4;
+nExtraDigit = floor((length(unique([D.type]))-nNormalDigit)/nOverrep);
+for extra = 1:nExtraDigit
+    name = sprintf('ext%02d',extra);
+    extra_laps = false;
+    for type = nNormalDigit+(extra-1)*nOverrep+1:nNormalDigit+extra*nOverrep
+        extra_laps = extra_laps | (train_laps & ([D.type]' == type));
     end
-    
-    trained = true;
-catch ME
-    fprintf('Error training GPFA for %s: %s\n', field, ME.identifier);
-    rethrow(ME);
+    model_trials.(name) = extra_laps;
+    model_digits.(name) = digits(nNormalDigit+extra*nOverrep);
 end
-
-%%
-% ========================================================================%
-%============== (5)    Save / Use saved data      ========================%
-%=========================================================================%
-
-if trained
-    fprintf('Will save at %s\n', [savepath fn]);
-    save([savepath fn], 'M', 'laps', 'R', 'keep_neurons', 'settings');
-    trained = false; %#ok<NASGU>
-    if isCommandWindowOpen
-        exit;
-    end
-else
-    M = info.M; %#ok<UNRCH>
-end
-
-
-%%
-% ========================================================================%
-%============== (6)    Show Neural Trajectories   ========================%
-%=========================================================================%
-
-%colors = cgergo.cExpon([2 3 1], :);
-colors = hsv(4);
-labels = [R.type];
-Xorth = show_latent({M.all}, R, colors, labels, Typetrial_tx);
-
-%%
-%=========================================================================%
-%=========(7) Compare mean spike counts              =====================%
-%=========================================================================%
-figure(7)
-set(gcf,'position',[100 100 500*1.62 500],'color','w')
-plot(mean([R(laps.left).y],2),'r','displayname','wheel after left')
-hold on
-plot(mean([R(laps.right).y],2),'b','displayname','wheel after right')
-ylabel('Average firing rate')
-xlabel('Cell No.')
-set(gca,'fontsize',14)
-savefig()
-
-figure(71)
-plot_timescales({M.left, M.right, M.all}, colors, {'trained_{left}', 'trained_{right}', 'trained_{all}'})
-
-%%
-%=========================================================================%
-%=========(8) Compute loglike P(run|model_run)       =====================%
-%=========================================================================%
-
-%load([roots{settings.animal} name_save_file])
-Rs           = R;
-%Rs           = shufftime(R);
-%Rs           = shuffspike(R);
-[Rs, Malt.left, Malt.right, Malt.all] = normalizedatanmodel(Rs, M.left, M.right, M.all);
-%sufficient: 1:4 or 12:16 or 21:22 or 23:24 or 25:30? OR 31:35
-%inconclusive: 5:10 and 17:18 and
-%spy = [1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 20 21 22 23 24 25 26 27 28 29 30 36 37 38 39 40 41 42 43 44 45 46];
-%for l = 1:length(Rs)
-%    Rs(l).y(spy,:)=0;
-%end
-%Classification stats of P(run events|model) 
-models      = {M.left, M.right};
-models      = {Malt.left, Malt.right};
-Xtats       = classGPFA(Rs, models);
-cm          = [Xtats.conf_matrix];
-fprintf('hitA: %2.2f%%, hitB: %2.2f%%\n', 100*cm(1,1),100*cm(2,2))
-
-% %show likelihood given the models
-% % plot show likelihood given the models
-label.title = 'P(run_j | Models_{left run, right run})';
-label.modelA = 'Left alt.';
-label.modelB = 'Right alt.';
-%label.modelB = 'Global model';
-label.xaxis = 'j';
-label.yaxis = 'P(run_j| Models_{left run, right run})';
-compareLogLike(Rs, Xtats, label)
-
-%XY plot
-cgergo = load('colors');
-
-label.title = 'LDA classifier';
-label.xaxis = 'P(run_j|Model_{left run})';
-label.yaxis = 'P(run_j|Model_{right run})';
-LDAclass(Xtats, label, cgergo.cExpon([2 3], :))
-
-%%
-%=========================================================================%
-%=========(8) Compute loglike P(wheel|model_wheel)   =====================%
-%=========================================================================%
-
-%If model was not trained it can be loaded:
-load([roots{animal} name_save_file])
-
-%transformation to W testing
-%W           = W(randperm(length(W))); %permutation of laps
-%W           = shufftime(W); %time shuffling for each lap
-
-errorTrials = find([W.type] > 2);                                          %erroneous trials wheel events
-We          = W(errorTrials);                                              %erroneous trials struct                 
-
-%Classification stats of P(proto_event|model) 
-models      = {M_right, M_left};                                           %here models have future run label, 
-Xtats       = classGPFA(W, models);
-
-cm          = [Xtats.conf_matrix];
-fprintf('Max-min Classifier hitA: %2.2f%%, hitB: %2.2f%%\n', 100*cm(1,1),100*cm(2,2))
-
-% plot show likelihood given the models
-label.title = 'P(wheel_j after error | models W)';
-label.modelA = 'Wheel after rigth alt.';
-label.modelB = 'Wheel after left alt.';
-
-label.xaxis = 'j';
-label.yaxis = 'P(wheel_j|model)';
-compareLogLike(W, Xtats, label)                                           %P(error W | models W)
-
-%XY plot
-label.title = '';
-label.modelA = 'Wheel after left alt.';
-label.modelB = 'Wheel after right alt.';
-label.xaxis = 'Log P(wheel|Model_{wheel after left run})';
-label.yaxis = 'Log P(wheel|Model_{wheel after right run})';
-LDAclass(Xtats, label, cgergo.cExpon([2 3], :))
-
-
-
-%%
-%=========================================================================%
-%=========(9) Compute loglike P(wheel|run_model)     =====================%
-%=========================================================================%
-%#TODO: Separate this part v in a different script
-
-in              = 'wheel'; %pre_turn
-out             = 'wheel'; %lat_arm
-maxTime         = 6;
-allTrials       = true; %use all trials of running to test since they are 
-                        %all unseen to the wheel model
-
-S = get_section(D, in, out, debug, namevar); %lap#1: sensor errors 
-W = segment(S, bin_size, Fs, keep_neurons,...
-                [namevar '_spike_train'], maxTime);
-W = filter_laps(W);
-W = W(randperm(length(W))); 
-
-models      = {M_left, M_right};
-Xtats       = classGPFA(W, models,[],allTrials);
-cm          = [Xtats.conf_matrix];
-fprintf('hitA: %2.2f%%, hitB: %2.2f%%\n', 100*cm(1,1),100*cm(2,2))
-
-% plot show likelihood given the models
-label.title = 'P(wheel_j | run model)';
-label.modelA = 'Run rigth alt.';
-label.modelB = 'Run left alt.';
-label.xaxis = 'j';
-label.yaxis = 'P(wheel_j|run model)';
-compareLogLike(R, Xtats, label)
-
-%XY plot
-label.title = 'Class. with Fisher Disc.';
-label.xaxis = 'P(wheel_j|run right)';
-label.yaxis = 'P(wheel_j|run left)';
-LDAclass(Xtats, label)
