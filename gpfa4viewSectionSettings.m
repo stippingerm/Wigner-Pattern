@@ -1,32 +1,39 @@
-%BRANCH2_CLEANED This script contains settings for GPFA training and procesing
+%TEMPLATE4GPFA This script contains settings for GPFA training and procesing
 %
-%        DESCRIPTION: This script is loaded by gpfa4run
+%        DESCRIPTION: This script is loaded by gpfa4batch
 %
 % Marcell Stippinger, 2016
 
 %directory
 settings.basepath        = '~/marcell/_Data_PassiveViewing/';
 settings.workpath        = '~/marcell/napwigner/work/';
-settings.pattern         = '(.*_MUA)\.mat';
+settings.pattern         = '(.*)_MUA\.mat';
+settings.paradigm        = 'viewing';
+
 %dataset
 settings.animal          = 5;
-%section in the maze to analyze (specific to HC-5)
-settings.section.in      = 'run';
-settings.section.out     = 'run';
 settings.debug           = false;
-settings.namevar         = 'run';
-%segmentation and filtering of silent neurons
-settings.train           = true;
-settings.filterParametrization = 'standard';
-settings.bin_size        = 0.01; %duration (s)
-settings.min_firing      = 0.5; %minimium firing rate (Hz)
-settings.median_firing   = 0.1;
-settings.interneuron_allowed = false;
-settings.filterTrails    = false; % filter trails with irregular speed/spike count?
+
+%interval in the viewing to analyze (specific to passive viewing)
+%viewing: times given in sec
+settings.section.in      = 0;
+settings.section.out     = -1;
+%viewing: whole
+settings.namevar         = 'view';
+
+
+%data binning and filtering of silent neurons
+settings.bin_size            = 0.01; %duration (s)
+settings.minFiringRate       = 0.5; %minimium firing rate (Hz)
+settings.medianFiringRate    = 0.1;
+settings.filterParametrization = 'standard'; % specific to viewing
+
 % GPFA training
 settings.showpred        = false; %show predicted firing rate
-settings.test_lap        = 10;
-settings.n_folds         = 3; %CV folds
+settings.filterTrials    = false; % filter trails with irregular spike count?
+settings.testTrial       = 10;
+settings.train           = 0; %redo training
+settings.nFolds          = 3; %CV folds
 settings.zDim            = 10; %latent dimension
 settings.maxTime         = 0; %maximum segmentation time, 0 if use all
-settings.maxLength       = 100; %maximum unsplitted time series length, 0 if no limit
+settings.maxLength       = 100; %maximum unsplitted time series length, 0 if no limit 

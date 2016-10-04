@@ -45,7 +45,7 @@ pos             = cat(2,data.Track.X,data.Track.Y,...
 %eeg             = data.Track.eeg;
 wh_speed        = data.Laps.WhlSpeedCW;
 isIntern        = data.Clu.isIntern;
-numLaps         = length(events);
+nLaps         = length(events);
 spk_clust       = get_spikes(data.Spike.totclu, data.Spike.res);
 TrialType       = num2cell(data.Par.TrialType);
 BehavType       = num2cell(data.Par.BehavType+1);
@@ -56,20 +56,20 @@ Typebehav_tx    = {'first', 'regular', 'uncertain'};
 Typeside_tx     = {'left', 'right', 'right', 'left'};
 % GPFA training
 showpred        = false; %show predicted firing rate
-test_lap        = 10;
+testTrial        = 10;
 side_select     = [1 2 2 1];
 
-allowed_clust   = settings.interneuron_allowed | isIntern(:);
+inChannels   = settings.interneuron_allowed | isIntern(:);
 
 % Extract spks when the rat is running in the sections [section_range]
-idx_lap=zeros(numLaps,2);
-idx_sec=zeros(numLaps,2);
-meta = repmat(struct('valid',true),numLaps,1);
+idx_lap=zeros(nLaps,2);
+idx_sec=zeros(nLaps,2);
+meta = repmat(struct('valid',true),nLaps,1);
 [meta.type]     = TrialType{:};
 [meta.behav]    = BehavType{:};
 [meta.side]     = num2var(side_select(cell2mat(TrialType)));
 
-for i_lap = 1:numLaps
+for i_lap = 1:nLaps
     
     % in some rare cases both left and right sections are visited
     % but non-visited section have entering and leaving time "0"
@@ -102,10 +102,10 @@ D = extract_general(Fs, settings.bin_size, spk_clust, pos, ...
 
 %show one lap for debug purposes 
 if settings.debug
-    figure(test_lap)
-    raster(D(test_lap).spikes), hold on
-    plot(90.*D(test_lap).speed./max(D(test_lap).speed),'k')
-    plot(90.*D(test_lap).wh_speed./max(D(test_lap).wh_speed),'r')
+    figure(testTrial)
+    raster(D(testTrial).spikes), hold on
+    plot(90.*D(testTrial).speed./max(D(testTrial).speed),'k')
+    plot(90.*D(testTrial).wh_speed./max(D(testTrial).wh_speed),'r')
 end
 
 % ========================================================================%
@@ -123,17 +123,17 @@ S = extract_general(Fs, 1.0/Fs, spk_clust, pos, ...
 cluster.MeanFiringRate = mean([S([S.valid]).spike_freq],2);
 cluster.MedianFiringRate = median([S([S.valid]).spike_freq],2);
 
-keep_neurons = (settings.min_firing<cluster.MeanFiringRate) & ...
-    (settings.median_firing<cluster.MedianFiringRate) & ...
-    (allowed_clust);
-fprintf('%d neurons fulfil the criteria for GPFA\n',sum(keep_neurons));
+gpfaChannels = (settings.minFiringRate<cluster.MeanFiringRate) & ...
+    (settings.medianFiringRate<cluster.MedianFiringRate) & ...
+    (inChannels);
+fprintf('%d neurons fulfil the criteria for GPFA\n',sum(gpfaChannels));
 
 
 %load run model and keep the same neurons
 if isCommandWindowOpen() && exist([savepath fn],'file') && ~settings.train
     fprintf('Will load from %s\n', [savepath fn]);
-    info = load([savepath fn], 'M', 'laps', 'R', 'keep_neurons', 'settings');
-    keep_neurons = info.keep_neurons;
+    info = load([savepath fn], 'M', 'laps', 'R', 'gpfaChannels', 'settings');
+    gpfaChannels = info.gpfaChannels;
     fprintf('Successfully loaded file, you may skip Section (4).\n');
 end
     
@@ -146,7 +146,7 @@ else
     train_laps         = true;
 end
 
-% FIXME: put keep_neurons in reshape_laps
+% FIXME: put gpfaChannels in reshape_laps
 % also deal with field names spk_count -> y and duaration -> T
 
 %%
@@ -158,8 +158,8 @@ try
     fields             = fieldnames(laps);
     for i_model = 1:numel(laps)
         field          = fields{i_model};
-        M.(field)      = trainGPFA(R, keep_neurons, train_laps & laps.(field), ...
-                                   settings.zDim, showpred, settings.n_folds, ...
+        M.(field)      = trainGPFA(R, gpfaChannels, train_laps & laps.(field), ...
+                                   settings.zDim, showpred, settings.nFolds, ...
                                    'max_length',settings.maxLength,...
                                    'spike_field','spike_count');
     end
@@ -177,7 +177,7 @@ end
 
 if trained
     fprintf('Will save at %s\n', [savepath fn]);
-    save([savepath fn], 'M', 'laps', 'R', 'keep_neurons', 'settings');
+    save([savepath fn], 'M', 'laps', 'R', 'gpfaChannels', 'settings');
     trained = false; %#ok<NASGU>
     exit;
 else
@@ -307,7 +307,7 @@ allTrials       = true; %use all trials of running to test since they are
                         %all unseen to the wheel model
 
 S = get_section(D, in, out, debug, namevar); %lap#1: sensor errors 
-W = segment(S, bin_size, Fs, keep_neurons,...
+W = segment(S, bin_size, Fs, gpfaChannels,...
                 [namevar '_spike_train'], maxTime);
 W = filter_laps(W);
 W = W(randperm(length(W))); 

@@ -13,11 +13,11 @@ settings.debug           = false;
 settings.namevar         = '|mode|';
 %segmentation and filtering of silent neurons
 settings.bin_size        = |bin_size|; %duration (s)
-settings.min_firing      = |fr|; %minimium firing rate (Hz)
+settings.minFiringRate      = |fr|; %minimium firing rate (Hz)
 settings.filterTrails    = false; % filter trails with irregular speed/spike count?
 % GPFA training
 settings.train           = 1; %redo training
-settings.n_folds         = 3; %CV folds
+settings.nFolds         = 3; %CV folds
 settings.zDim            = |zDim|; %latent dimension
 settings.maxTime         = 0; %maximum segmentation time, 0 if use all
 settings.maxLength       = 100; %maximum unsplitted time series length, 0 if no limit

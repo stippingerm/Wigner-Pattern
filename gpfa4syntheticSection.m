@@ -39,13 +39,13 @@ trained         = false;
 
 %========================Paramteres and variables==========================
 data            = dlmread(files{settings.animal},'',1,0);
-numLaps         = 12;
+nLaps         = 12;
 Fs              = 100;
 data(:,1)       = round(data(:,1)*Fs);
 totalDuration   = max(data(:,1));
-lapDuration     = round(linspace(0,totalDuration,numLaps+1));
-events          = cell(numLaps,1);
-for n = 1:numLaps
+lapDuration     = round(linspace(0,totalDuration,nLaps+1));
+events          = cell(nLaps,1);
+for n = 1:nLaps
 events{n}       = [lapDuration(n)+1 lapDuration(n+1)];
 end
 idx_lap         = cell2mat(events);
@@ -59,13 +59,13 @@ catch ME
     SPW_X       = zeros(totalDuration,size(pos,2));
 end
 pos             = [pos state SPW_X];
-n_cells         = max(data(:,2));
-allowed_clust   = ones(n_cells,1);
+nChannels         = max(data(:,2));
+inChannels   = ones(nChannels,1);
 spk_clust       = get_spikes(data(:,2), data(:,1));
-meta = repmat(struct('valid',true),numLaps,1);
+meta = repmat(struct('valid',true),nLaps,1);
 
-TrialType       = ones(1,numLaps);
-BehavType       = ones(1,numLaps) .* (1+1);
+TrialType       = ones(1,nLaps);
+BehavType       = ones(1,nLaps) .* (1+1);
 clear data
 % String descriptions
 Typetrial_tx    = {'free_run'};
@@ -73,7 +73,7 @@ Typebehav_tx    = {'first', 'regular', 'uncertain'};
 Typeside_tx     = {'none'};
 % GPFA training
 showpred        = false; %show predicted firing rate
-test_lap        = 10;
+testTrial        = 10;
 
 
 laps.all        = select_laps(BehavType, TrialType, settings.namevar);
@@ -90,10 +90,10 @@ D = extract_general(Fs, settings.bin_size, spk_clust, pos, ...
 
 %show one lap for debug purposes 
 if settings.debug
-    figure(test_lap)
-    raster(D(test_lap).spikes), hold on
-    plot(90.*D(test_lap).speed./max(D(test_lap).speed),'k')
-    plot(90.*D(test_lap).wh_speed./max(D(test_lap).wh_speed),'r')
+    figure(testTrial)
+    raster(D(testTrial).spikes), hold on
+    plot(90.*D(testTrial).speed./max(D(testTrial).speed),'k')
+    plot(90.*D(testTrial).wh_speed./max(D(testTrial).wh_speed),'r')
 end
 
 % ========================================================================%
@@ -112,17 +112,17 @@ S = extract_general(Fs, settings.bin_size, spk_clust, pos, ...
 cluster.MeanFiringRate = mean([S([S.valid]).spike_freq],2);
 cluster.MedianFiringRate = median([S([S.valid]).spike_freq],2);
 
-keep_neurons = (settings.min_firing<cluster.MeanFiringRate) & ...
-    (settings.median_firing<cluster.MedianFiringRate) & ...
-    (allowed_clust);
-fprintf('%d neurons fulfil the criteria for GPFA\n',sum(keep_neurons));
+gpfaChannels = (settings.minFiringRate<cluster.MeanFiringRate) & ...
+    (settings.medianFiringRate<cluster.MedianFiringRate) & ...
+    (inChannels);
+fprintf('%d neurons fulfil the criteria for GPFA\n',sum(gpfaChannels));
 
 
 %load run model and keep the same neurons
 if isCommandWindowOpen() && exist([savepath fn],'file') && ~settings.train
     fprintf('Will load from %s\n', [savepath fn]);
-    info = load([savepath fn], 'M', 'laps', 'R', 'keep_neurons', 'settings');
-    keep_neurons = info.keep_neurons;
+    info = load([savepath fn], 'M', 'laps', 'R', 'gpfaChannels', 'settings');
+    gpfaChannels = info.gpfaChannels;
     fprintf('Successfully loaded file, you may skip Section (4).\n');
 end
 
@@ -146,8 +146,8 @@ try
     fields             = fieldnames(laps);
     for i_model = 1:numel(laps)
         field          = fields{i_model};
-        M.(field)      = trainGPFA(R, keep_neurons, train_laps & laps.(field), ...
-                                   settings.zDim, showpred, settings.n_folds, ...
+        M.(field)      = trainGPFA(R, gpfaChannels, train_laps & laps.(field), ...
+                                   settings.zDim, showpred, settings.nFolds, ...
                                    'max_length',settings.maxLength,...
                                    'spike_field','spike_count');
     end
@@ -165,7 +165,7 @@ end
 
 if trained
     fprintf('Will save at %s\n', [savepath fn]);
-    save([savepath fn], 'M', 'laps', 'R', 'keep_neurons', 'settings');
+    save([savepath fn], 'M', 'laps', 'R', 'gpfaChannels', 'settings');
     trained = false; %#ok<NASGU>
     exit;
 else
@@ -232,7 +232,7 @@ set(gcf,'position',[100 100 500*1.62 500],'color','w')
 %plot(mean([R(laps.all).y],2),'r','displayname','firintg rate')
 plot(mean([S(laps.all).spike_train],2)*Fs,'r','displayname','firintg rate');
 hold on
-plot(keep_neurons,'bx','displayname','firintg rate');
+plot(gpfaChannels,'bx','displayname','firintg rate');
 hold off
 ylabel('Average firing rate')
 xlabel('Cell No.')
@@ -337,7 +337,7 @@ allTrials       = true; %use all trials of running to test since they are
                         %all unseen to the wheel model
 
 S = get_section(D, in, out, debug, namevar); %lap#1: sensor errors 
-W = segment(S, bin_size, Fs, keep_neurons,...
+W = segment(S, bin_size, Fs, gpfaChannels,...
                 [namevar '_spike_train'], maxTime);
 W = filter_laps(W);
 W = W(randperm(length(W))); 
