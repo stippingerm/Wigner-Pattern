@@ -14,7 +14,7 @@ function Xtats = classGPFA(P, models, varargin)
 %                       the classification confusion matrix where positive samples correspond
 %                       to right alternations whereas negative samples are left alternations;
 %                       output of the classifier {1:right, 2:left}, real label, and the
-%                       log posterior P(data|model).
+%                       log posterior P(data|param).
 %
 %
 %Version 1.0 Ruben Pinzon@2015
@@ -41,6 +41,7 @@ model_like  = zeros(length(models), n_laps);
 model_tol   = zeros(length(models), n_laps);
     
 for m = 1 : length(models)
+    fprintf('%d',m);
     %likelikehood   = -Inf*ones(folds, n_laps);
     likelikehood   = nan(folds, n_laps);
 
@@ -61,29 +62,44 @@ for m = 1 : length(models)
         end
 
         %select the model parameters from the fold#1 
-        model = models{m}.params{ifold};
+        param = models{m}.params{ifold};
+        keep_neurons = models{m}.keep_neurons;
         %rescale time scale of the GP if needed.
         if scale
-           model.gamma = model.gamma .* (scaleK .^ 2);
-           model.d = model.d .* sqrt(scaleRate);
-           model.C = model.C .* sqrt(scaleRate);
-           model.R = model.R .* sqrt(scaleVar);
+           param.gamma = param.gamma .* (scaleK .^ 2);
+           param.d = param.d .* sqrt(scaleRate);
+           param.C = param.C .* sqrt(scaleRate);
+           param.R = param.R .* sqrt(scaleVar);
         end
         
         if ~mergeTrials
-            for p = 1 : length(unseenP) 
+            %for p = 1 : length(unseenP) 
+                %lap   = unseenP(p);
+            like = nan(n_laps);
+            parfor p = 1 : length(unseenP)
                 lap   = unseenP(p);
 
-                [traj, ll] = exactInferenceWithLL(P(lap), model,'getLL',1);       
-                likelikehood(ifold,lap) = ll / P(lap).T;
+                tmp = reshape_laps(P(lap), keep_neurons, 100);
+                [traj, ll] = exactInferenceWithLL(tmp, param,'getLL',1);       
+                %likelikehood(ifold,lap) = ll / sum([tmp.T]);
+                like(p) = ll / sum([tmp.T]);
                 %likelikehood(ifold,lap) = ll;
+                fprintf('.');
+            end
+            for p = 1 : length(unseenP)
+                lap   = unseenP(p);
+                likelikehood(ifold,lap) = like(p);
             end
         else
             % evaluating trials together involves one inversion only for
             % laps of same length but ll will also be identic
-            [traj, ll] = exactInferenceWithLL(P(unseenP), model,'getLL',1);
-            likelikehood(ifold,unseenP) = ll / sum([P(unseenP).T]);
+            tmp = reshape_laps(P(unseenP), keep_neurons, 100);
+            [traj, ll] = exactInferenceWithLL(tmp, param,'getLL',1);
+            likelikehood(ifold,unseenP) = ll / sum([tmp.T]);
+            fprintf('*');
         end
+        fprintf('\n');
+        
     end
     
     %model_like(m,:) = max(likelikehood);
@@ -93,7 +109,7 @@ end
 
 [~, max_mod]    = max(model_like);
 
-type            = [P.type]; %{P(proto|model) , realtag}
+type            = [P.type]; %{P(proto|param) , realtag}
 
 
 TP            = sum(max_mod == 1 & type == 1)/(sum(type == 1));

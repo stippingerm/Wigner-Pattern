@@ -25,8 +25,10 @@ cv_trials       = randperm(length(select_laps));
 fold_indx       = floor(linspace(1,length(select_laps)+1, folds+1));
 
 mse             = zeros(1,folds);
-like            = zeros(1,folds);
+like_te         = zeros(1,folds);
 like_tr         = cell(1, folds);
+length_te       = zeros(1,folds);
+length_tr       = zeros(1,folds);
 paramsGPFA      = cell(1, folds);
 test_trials     = cell(1, folds);
 train_trials    = cell(1, folds);
@@ -65,8 +67,9 @@ for ifold = 1 : folds  % two-fold cross-validation
     traj = segmentByTrial(traj, Xorth, 'data'); %needed?
 
     %Validation with LNO
+    %McReall: this function uses a list of coordinates, e.g. 1:zDim
     cv_gpfa_cell = struct2cell(cosmoother_gpfa_viaOrth_fast...
-                              (test_data,params,zDim));
+                              (test_data,params,1:zDim));
 
     true_data      = [test_data.y];
     T              = [0 cumsum([test_data.T])];
@@ -81,8 +84,10 @@ for ifold = 1 : folds  % two-fold cross-validation
     end
 
     mse(ifold)          = mse_fold;
-    like(ifold)         = ll_te;
+    like_te(ifold)      = ll_te;
+    length_te(ifold)    = T(end);
     like_tr{ifold}      = ll_tr;
+    length_tr(ifold)    = sum([train_data.T]);
     paramsGPFA{ifold}   = params;
     
     fprintf('Trained/validated fold %d\n\n',ifold)
@@ -91,8 +96,10 @@ end
 
 M.params      = paramsGPFA;
 M.mse         = mse;
-M.like_test   = like;
+M.like_test   = like_te;
 M.like_train  = like_tr;
+M.length_test = length_te;
+M.length_train= length_tr;
 M.testTrials  = test_trials;
 M.trainTrials = train_trials;
 M.keep_neurons= select_clust;

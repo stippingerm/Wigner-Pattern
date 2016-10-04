@@ -1,15 +1,24 @@
 function R = reshape_laps(D, keep_neurons, max_length, varargin)
 %RESHAPE_LAPS is a utility to format spiking data for the GPFA implementation
 %    additionally it
-%    - restricts the set of available neurons
-%    - splits long laps into smaller units improving the speed of GPFA
+%    * restricts the set of available neurons
+%    * splits long laps into smaller units improving the speed of GPFA
+%Input:
+%    D: spike data with fields spike_field (default: 'spike_count' or 'y')
+%    keep_neurons: channels to keep
+%    max_length: maximal duration to be kept as one lap
+%    You can optionally overrife varagin.
 %
 % Author:
 % Marcell Stippinger, 2016
 
 %TODO: implement overlapping splittings to simulate continuity over time
 
-spike_field     = 'y';
+if isfield(D,'spike_count')
+    spike_field = 'spike_count';
+else
+    spike_field = 'y';
+end
 %duration_field  = 'T';
 assignopts(who, varargin);
 
@@ -20,7 +29,11 @@ n_pieces        = 0;
 for i_lap = 1 : n_laps
     %lap_length  = D(i_lap).(duration_field);
     lap_length  = size(D(i_lap).(spike_field),2);
-    lap_pieces  = ceil(lap_length*1./max_length);
+    if max_length
+        lap_pieces  = ceil(lap_length*1./max_length);
+    else
+        lap_pieces  = 1;
+    end
     n_pieces    = n_pieces + lap_pieces;
 
     separators{i_lap} = round(linspace(1,lap_length+1,lap_pieces+1));
