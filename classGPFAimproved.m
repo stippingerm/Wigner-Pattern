@@ -39,8 +39,9 @@ n_laps      = length(P);
 v_laps      = [P.trialId];
 model_like  = zeros(length(models), n_laps);
 model_tol   = zeros(length(models), n_laps);
-    
-for m = 1 : length(models)
+
+% TODO: do the folds in parallel instead of the models.
+parfor m = 1 : length(models)
     fprintf('%d',m);
     %likelikehood   = -Inf*ones(folds, n_laps);
     likelikehood   = nan(folds, n_laps);
@@ -75,26 +76,19 @@ for m = 1 : length(models)
         if ~mergeTrials
             %for p = 1 : length(unseenP) 
                 %lap   = unseenP(p);
-            like = nan(n_laps);
-            parfor p = 1 : length(unseenP)
-                lap   = unseenP(p);
-
-                tmp = reshape_laps(P(lap), keep_neurons, 100);
-                [traj, ll] = exactInferenceWithLL(tmp, param,'getLL',1);       
-                %likelikehood(ifold,lap) = ll / sum([tmp.T]);
-                like(p) = ll / sum([tmp.T]);
-                %likelikehood(ifold,lap) = ll;
-                fprintf('.');
-            end
+            [tmp, originals] = reshape_laps(P(unseenP), keep_neurons, 100);
+            [tmptraj, tmpll] = exactInferenceWithLLperTrial(tmp, param,'getLL',1);      
+            fprintf('.');
             for p = 1 : length(unseenP)
                 lap   = unseenP(p);
-                likelikehood(ifold,lap) = like(p);
+                sel   = originals == lap;
+                likelikehood(ifold,lap) = sum([tmptraj(sel).LL]) / sum([tmptraj(sel).T]) ;
             end
         else
             % evaluating trials together involves one inversion only for
             % laps of same length but ll will also be identic
             tmp = reshape_laps(P(unseenP), keep_neurons, 100);
-            [traj, ll] = exactInferenceWithLL(tmp, param,'getLL',1);
+            [tmptraj, ll] = exactInferenceWithLLperTrial(tmp, param,'getLL',1);
             likelikehood(ifold,unseenP) = ll / sum([tmp.T]);
             fprintf('*');
         end
