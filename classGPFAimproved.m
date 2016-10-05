@@ -1,4 +1,4 @@
-function Xtats = classGPFA(P, models, varargin)
+function Xtats = classGPFAimproved(P, models, varargin)
 %CLASSGPFA  Given a data struct P containing spike count vectors and GPFA models, this file computes a
 %           binary classification as the argmax P(data|each_model).
 %
@@ -17,10 +17,11 @@ function Xtats = classGPFA(P, models, varargin)
 %                       log posterior P(data|param).
 %
 %
-%Version 1.0 Ruben Pinzon@2015
+%Version 1.0 Marcell Stippinger, 2016
 scaleK       = 1.0;
 scaleRate    = 1.0;
 scaleVar     = 1.0;
+labelField   = 'type';
 
 useAllTrials = false;
 mergeTrials  = false;
@@ -41,8 +42,8 @@ model_like  = zeros(length(models), n_laps);
 model_tol   = zeros(length(models), n_laps);
 
 % TODO: do the folds in parallel instead of the models.
-parfor m = 1 : length(models)
-    fprintf('%d',m);
+parfor i_model = 1 : length(models)
+    fprintf('%d',i_model);
     %likelikehood   = -Inf*ones(folds, n_laps);
     likelikehood   = nan(folds, n_laps);
 
@@ -50,7 +51,7 @@ parfor m = 1 : length(models)
         
         if ~useAllTrials
             %remove trials used during training
-            usedlaps    = models{m}.trainTrials{ifold};
+            usedlaps    = models{i_model}.trainTrials{ifold};
             unseenP     = ones(1,n_laps);
             for u = 1 : length(usedlaps)
                 %u_idx = find(v_laps == usedlaps(u));
@@ -63,8 +64,8 @@ parfor m = 1 : length(models)
         end
 
         %select the model parameters from the fold#1 
-        param = models{m}.params{ifold};
-        keep_neurons = models{m}.keep_neurons;
+        param = models{i_model}.params{ifold};
+        keep_neurons = models{i_model}.keep_neurons;
         %rescale time scale of the GP if needed.
         if scale
            param.gamma = param.gamma .* (scaleK .^ 2);
@@ -81,7 +82,7 @@ parfor m = 1 : length(models)
             fprintf('.');
             for p = 1 : length(unseenP)
                 lap   = unseenP(p);
-                sel   = originals == lap;
+                sel   = originals == p;
                 likelikehood(ifold,lap) = sum([tmptraj(sel).LL]) / sum([tmptraj(sel).T]) ;
             end
         else
@@ -97,13 +98,13 @@ parfor m = 1 : length(models)
     end
     
     %model_like(m,:) = max(likelikehood);
-    model_like(m,:) = nanmean(likelikehood);
-    model_tol(m,:) = (nanmax(likelikehood)-nanmin(likelikehood))/(folds-1);
+    model_like(i_model,:) = nanmean(likelikehood);
+    model_tol(i_model,:) = (nanmax(likelikehood)-nanmin(likelikehood))/(folds-1);
 end
 
 [~, max_mod]    = max(model_like);
 
-type            = [P.type]; %{P(proto|param) , realtag}
+type            = [P.(labelField)]; %{P(proto|param) , realtag}
 
 
 TP            = sum(max_mod == 1 & type == 1)/(sum(type == 1));
@@ -112,6 +113,7 @@ FP            = sum(max_mod == 1 & type == 2)/(sum(type == 2));
 TN            = sum(max_mod == 2 & type == 1)/(sum(type ~= 2));
 
 Xtats.conf_matrix    = [TP, FP; TN, FN];
+% suggested Xtats.conf_matrix    = confusionmat(Xtats.real_label,Xtats.class_output);
 Xtats.class_output   = max_mod;
 Xtats.real_label     = type;
 Xtats.likelihood     = model_like;

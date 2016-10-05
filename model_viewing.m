@@ -11,7 +11,8 @@ digits = codes.(project);
 nNormalDigit = 10;
 nOverrep = 4;
 
-info.decoder  = cell(nNormalDigit, 1);
+info.labelField = 'digit';
+info.decoder    = cell(nNormalDigit, 1);
 
 fields             = fieldnames(info.M);
 for i_model = 1:numel(fields)
@@ -27,7 +28,7 @@ for i_model = 1:numel(fields)
     if id > 0
         prediction = digits(id);
     else
-        prediction = -1;
+        prediction = -2;
     end
     
     info.M.(field).prediction = prediction;
@@ -35,7 +36,12 @@ for i_model = 1:numel(fields)
     % NOTE: in the ordering of fields ext01 is after all numXX
     % therefore the more robust model will be used
     if prediction == 0
+        % digit zero must get a valid array index
         prediction = 10;
+    end
+    if prediction == -1
+        % prediction of blanks
+        prediction = length(info.decoder) + 1;
     end
     if prediction > 0
         info.decoder{prediction} = info.M.(field);

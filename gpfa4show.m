@@ -89,52 +89,65 @@ plot_timescales({M.left, M.right, M.all}, colors, {'trained_{left}', 'trained_{r
 %=========(8) Compute loglike P(run|model_run)       =====================%
 %=========================================================================%
 
-%load([roots{settings.animal} name_save_file])
+% Data shuffling: none, neural words, spike rates independently
 Rs           = D;
 %Rs           = shufftime(R);
 %Rs           = shuffspike(R);
+
+% Whether to make data look zero mean and unit vaiance
 %[Rs, Malt.left, Malt.right, Malt.all] = normalizedatanmodel(Rs, M.left, M.right, M.all);
+
+% Notes and tests on predictability for HC-5 database
 %sufficient: 1:4 or 12:16 or 21:22 or 23:24 or 25:30? OR 31:35
 %inconclusive: 5:10 and 17:18 and
 %spy = [1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 20 21 22 23 24 25 26 27 28 29 30 36 37 38 39 40 41 42 43 44 45 46];
 %for l = 1:length(Rs)
 %    Rs(l).y(spy,:)=0;
 %end
+
+
 %Classification stats of P(run events|model)
 
+
+try
+% Imprved prediction based on annotated models (use model_{paradigm}.m loader)
 models             = info.decoder;
+Xtats              = classGPFAimproved(Rs, models, 'labelField', info.labelField);
+Ytats              = Xtats;
+tmp                = cell2mat(models);
+Ytats.class_output = [tmp(Xtats.class_output).prediction];
+label.model        = {tmp.name};
+[Rs.type]          = Rs.digit;
 
-%models      = {M.left, M.right};
-%models      = {Malt.left, Malt.right};
-Xtats       = classGPFA(Rs, models);
-Xtats       = classGPFAimproved(Rs, models);
-cm          = [Xtats.conf_matrix];
-fprintf('hitA: %2.2f%%, hitB: %2.2f%%\n', 100*cm(1,1),100*cm(2,2))
-
-Ytats = Xtats;
-for i = 1:length(Xtats)
-    Ytats.class_output(i) = models{Xtats.class_output(i)}.prediction;
+catch ME
+% Basic prediction capabiliy
+models             = struct2cell(info.M);
+Xtats              = classGPFA(Rs, models);
+Ytats              = Xtats;
+Ytats.class_output = Xtats.class_output-1;
+label.model = fieldnames(info.M);
 end
+
 % %show likelihood given the models
 % % plot show likelihood given the models
 label.title = 'Classification using trial likelihood according to models';
-for i = 1:length(models)
-    tmp{i} = models{i}.name;
-end
-label.model = tmp;
-%label.modelB = 'Global model';
 label.xaxis = 'j';
 label.yaxis = 'P(trial_i | Model_j)';
 compareLogLike(Rs, Ytats, label)
 
-%XY plot
 if nModels == 2
-cgergo = load('colors');
+    
+    % Confusion matrix (use for two models only)
+    cm          = [Xtats.conf_matrix];
+    fprintf('hitA: %2.2f%%, hitB: %2.2f%%\n', 100*cm(1,1),100*cm(2,2))
 
-label.title = 'LDA classifier';
-label.xaxis = 'P(run_j|Model_{left run})';
-label.yaxis = 'P(run_j|Model_{right run})';
-LDAclass(Xtats, label, cgergo.cExpon([2 3], :))
+    %XY plot
+    cgergo = load('colors');
+
+    label.title = 'LDA classifier';
+    label.xaxis = 'P(run_j|Model_{left run})';
+    label.yaxis = 'P(run_j|Model_{right run})';
+    LDAclass(Xtats, label, cgergo.cExpon([2 3], :))
 end
 %%
 %=========================================================================%

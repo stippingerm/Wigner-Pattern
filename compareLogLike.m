@@ -34,7 +34,7 @@ for t = 1 : nTrials
   typeAssigned = sprintf('%d',Xtats.class_output(t));
   if twoModels
       c = 'r';
-      if Xtats.class_output(t) == D(t).type
+      if Xtats.class_output(t) == Xtats.real_label(t);
           c = 'k';
       end
   else

@@ -26,7 +26,7 @@ function [varargout] = num2var(a,dims)
 %   See also MAT2CELL, CELL2MAT
 
 %   Clay M. Thompson 3-15-94
-%   Copyright 1984-2012 The MathWorks, Inc.
+%   Copyright 1984-2012 The MathWorks, Inc., 2016 Marcell Stippinger
 
 narginchk(1,2);
 if nargin==1

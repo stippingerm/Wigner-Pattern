@@ -145,16 +145,19 @@ function [seq, LL] = exactInferenceWithLL(seq, params, varargin)
       % Compute data likelihood
       val = -T * logdet_R - logdet_K_big - logdet_M -...
             yDim * T * log(2*pi);
-      ll_bins = sum((Rinv * dif) .* dif);
-      tmp = reshape(ll_bins, T, length(nList));
-      [seq(nList).LL] = num2var( val - sum(tmp) +...
-                                 sum((invM' * term1Mat) .* term1Mat) );
+      ll_bins = reshape(sum((Rinv * dif) .* dif), T, length(nList));
+      tmp = 0.5 * (val - sum(ll_bins) +...
+                   sum((invM' * term1Mat) .* term1Mat) );
+      if length(tmp) ~= length(nList)
+          error('Unmatching result');
+      end
+      [seq(nList).LL] = num2var( tmp );
     end
 
   end
 
   if getLL
-    LL = sum([seq.LL]) / 2;
+    LL = sum([seq.LL]);
   else 
     LL = NaN;
   end
