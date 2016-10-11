@@ -15,9 +15,9 @@ settings.animal          = 5;
 settings.debug           = false;
 
 %interval in the viewing to analyze (specific to passive viewing)
-%viewing: times given in sec
-settings.section.in      = 0;
-settings.section.out     = -1;
+%viewing: start trans_on view trans_off end - indexed by pos. integers
+settings.section.in      = 1;
+settings.section.out     = 5;
 %viewing: whole
 settings.namevar         = 'view';
 
@@ -26,7 +26,8 @@ settings.namevar         = 'view';
 settings.bin_size            = 0.01; %duration (s)
 settings.minFiringRate       = 0.5; %minimium firing rate (Hz)
 settings.medianFiringRate    = 0.1;
-settings.filterParametrization = 'standard'; % specific to viewing
+settings.filterParametrization = 'auto'; % specific to viewing
+settings.channelsFromDB      = true; % specific to viewing
 
 % GPFA training
 settings.showpred        = false; %show predicted firing rate

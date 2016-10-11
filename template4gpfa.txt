@@ -7,7 +7,7 @@
 %directory
 settings.basepath        = '~/marcell/_Data_PassiveViewing/';
 settings.workpath        = '~/marcell/napwigner/work/';
-settings.pattern         = '(.*_MUA)\.mat';
+settings.pattern         = '(.*)_MUA\.mat';
 settings.paradigm        = 'viewing'; % losonczi, maze, synthetic, viewing
 
 %dataset
@@ -28,7 +28,7 @@ settings.nTrials         = 12; % how to split data into trials
 %maze: mid_arm, preturn, turn, lat_arm, reward, delay, wheel
 
 %interval in the viewing to analyze (specific to passive viewing)
-%viewing: times given in sec
+%viewing: start trans_on view trans_off end - indexed by pos. integers
 
 settings.section.in      = '|in|';
 settings.section.out     = '|out|';
@@ -47,7 +47,8 @@ settings.namevar         = '|mode|';
 settings.bin_size            = |bin_size|; %duration (s)
 settings.minFiringRate       = |fr|; %minimium firing rate (Hz)
 settings.medianFiringRate    = 0.1;
-settings.filterParametrization = 'standard'; % specific to viewing
+settings.filterParametrization = 'auto'; % specific to viewing
+settings.channelsFromDB      = true; % specific to viewing
 settings.interneuron_allowed = false; % specific to maze
 
 % GPFA training
@@ -55,7 +56,7 @@ settings.showpred        = false; %show predicted firing rate
 settings.filterTrials    = false; % filter trails with irregular spike count?
 settings.testTrial       = 10;
 settings.train           = true;
-settings.nFolds          = 3; %CV folds
+settings.nFolds          = |folds|; %CV folds, default it to 3
 settings.zDim            = |zDim|; %latent dimension
 settings.maxTime         = 0; %maximum segmentation time, 0 if use all
 settings.maxLength       = 100; %maximum unsplitted time series length, 0 if no limit

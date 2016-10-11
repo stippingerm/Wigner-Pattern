@@ -1,12 +1,12 @@
 function [ info ] = model_viewing( fn, settings )
-%UNTITLED Summary of this function goes here
-%   Detailed explanation goes here
+%MODEL_VIEWING loads the saved GPFA model and provides a robst digit
+%predictor
 
 info = load(fn,  'M', 'modelTrials', 'D', 'inChannels', 'settings');
 project         = regexprep(fn,'.*/([^_]*).*','$1');
 
 codes = code_table_view();
-digits = codes.(project);
+type2digit = codes.(project);
 
 nNormalDigit = 10;
 nOverrep = 4;
@@ -26,7 +26,7 @@ for i_model = 1:numel(fields)
     end
     
     if id > 0
-        prediction = digits(id);
+        prediction = type2digit(id);
     else
         prediction = -2;
     end
