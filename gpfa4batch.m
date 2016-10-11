@@ -22,7 +22,7 @@ end
 
 run(settings_file);
 
-
+%%
 %========================       Source data      ==========================
 
 [files, roots, animals] = get_matFiles(settings.basepath,settings.pattern);
@@ -72,10 +72,16 @@ try
     for i_model = 1:numel(fields)
         field          = fields{i_model};
         fprintf('%s\n',field);
+        % Hack to add a full-fledged GPFA
+        if strcmp(field,'onefold')
+            nFolds = 1;
+        else
+            nFolds = settings.nFolds;
+        end
         M.(field)      = trainGPFA(D, gpfaChannels & inChannels, ...
                                    train_laps & modelTrials.(field), ...
                                    settings.zDim, settings.showpred, ...
-                                   settings.nFolds, ...
+                                   nFolds, ...
                                    'max_length', settings.maxLength,...
                                    'spike_field','spike_count');
     end

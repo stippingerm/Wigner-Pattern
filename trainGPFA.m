@@ -1,6 +1,8 @@
 function M = trainGPFA(D, select_clust, select_laps, zDim, showpred, folds, varargin)
 %TRAINGPFA trains an cross validates a gpfa model with the data in D, using given folds
-%           fields required in D: y: spike trains
+%           fields required in D:
+%                  trialId: the array index in D (TODO: remove this)
+%                  y: spike trains (or whatever needed for reshape_laps)
 %           select_laps: the integer IDs of the laps to be included
 %           zDim: number of latent dimensions
 %           showpred: whether to use graphical debugging
@@ -22,7 +24,11 @@ end
 
 cv_mask         = false(1,length(select_laps));
 cv_trials       = randperm(length(select_laps));
-fold_indx       = floor(linspace(1,length(select_laps)+1, folds+1));
+if folds > 1
+    fold_indx   = floor(linspace(1,length(select_laps)+1, folds+1));
+else
+    fold_indx   = [1 0];
+end
 
 mse             = zeros(1,folds);
 like_te         = zeros(1,folds);
@@ -33,7 +39,7 @@ paramsGPFA      = cell(1, folds);
 test_trials     = cell(1, folds);
 train_trials    = cell(1, folds);
 
-for ifold = 1 : folds  % two-fold cross-validation        
+for ifold = 1 : folds  % n-fold cross-validation        
     % prepare masks:
     % test_mask isolates a single fold, train_mask takes the rest
     
@@ -63,8 +69,8 @@ for ifold = 1 : folds  % two-fold cross-validation
     %Posterior of test data given the trained model
     [traj, ll_te] = exactInferenceWithLL(test_data, params,'getLL',1);
     % orthogonalize the trajectories
-    [Xorth, Corth] = orthogonalize([traj.xsm], params.C);
-    traj = segmentByTrial(traj, Xorth, 'data'); %needed?
+    %[Xorth, Corth] = orthogonalize([traj.xsm], params.C);
+    %traj = segmentByTrial(traj, Xorth, 'data'); %needed?
 
     %Validation with LNO
     %McReall: this function uses a list of coordinates, e.g. 1:zDim

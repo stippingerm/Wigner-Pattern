@@ -22,7 +22,7 @@ end
 
 run(settings_file);
 
-
+%%
 %========================       Source data      ==========================
 
 [files, roots, animals] = get_matFiles(settings.basepath,settings.pattern);
@@ -134,6 +134,8 @@ label.title = 'Classification using trial likelihood according to models';
 label.xaxis = 'j';
 label.yaxis = 'P(trial_i | Model_j)';
 compareLogLike(Rs, Ytats, label)
+cm = confusionmat(Ytats.real_label,Ytats.class_output);
+hit_ratio = sum(diag(cm))/sum(sum(cm))
 
 if nModels == 2
     

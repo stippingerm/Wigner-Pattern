@@ -3,6 +3,7 @@ function [R, varargout] = reshape_laps(D, keep_neurons, max_length, varargin)
 %    additionally it
 %    * restricts the set of available neurons
 %    * splits long laps into smaller units improving the speed of GPFA
+%      while trying to preserve correlations using overlapping units
 %Input:
 %    D: spike data with fields spike_field (default: 'spike_count' or 'y')
 %    keep_neurons: channels to keep
@@ -36,7 +37,11 @@ for i_lap = 1 : n_laps
     end
     n_pieces    = n_pieces + lap_pieces;
 
-    separators{i_lap} = round(linspace(1,lap_length+1,lap_pieces+1));
+    ls          = round(linspace(1,lap_length+1,lap_pieces+1));
+    sep1        = [ls(1:end-1)' ls(2:end)'];
+    ls          = round([1 mean(sep1,2)' lap_length+1]);
+    sep2        = [ls(1:end-1)' ls(2:end)'];
+    separators{i_lap} = [sep1; sep2];
 end
 
 % copy only the field names from D and
@@ -51,16 +56,19 @@ R               = struct(D(1:0));
 n_pieces        = 0;
 originals       = zeros(n_pieces,1);
 
+
+% TODO: deal with fields spikes and spike_count, e.g. remove them
+
 for i_lap = 1 : n_laps
     lap_sepa    = separators{i_lap};
-    lap_pieces  = length(lap_sepa)-1;
+    lap_pieces  = size(lap_sepa,1);
 
     %R(n_pieces+1:n_pieces+lap_pieces) = repmat(D(i_lap),lap_pieces);
     
     for j = 1 : lap_pieces
         R(n_pieces+j) = D(i_lap);
-        R(n_pieces+j).T = lap_sepa(j+1)-lap_sepa(j);
-        R(n_pieces+j).y = D(i_lap).(spike_field)(keep_neurons,lap_sepa(j):lap_sepa(j+1)-1);
+        R(n_pieces+j).T = lap_sepa(j,2)-lap_sepa(j,1);
+        R(n_pieces+j).y = D(i_lap).(spike_field)(keep_neurons,lap_sepa(j,1):lap_sepa(j,2)-1);
     end
     originals(n_pieces+1:n_pieces+lap_pieces) = i_lap;
     n_pieces = n_pieces + lap_pieces;

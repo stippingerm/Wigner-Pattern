@@ -52,10 +52,8 @@ for i_model = 1 : length(models)
             %remove trials used during training
             usedlaps    = models{i_model}.trainTrials{ifold};
             unseenP     = ones(1,n_laps);
-            for u = 1 : length(usedlaps)
-                %u_idx = find(v_laps == usedlaps(u));
-                %unseenP(u_idx) = 0;
-                unseenP(v_laps == usedlaps(u)) = 0;
+            for u = usedlaps
+                unseenP(v_laps == u) = 0;
             end
             unseenP = find(unseenP ==1);
         else
