@@ -24,11 +24,13 @@ run(settings_file);
 
 %%
 %========================       Source data      ==========================
+settings.section.in  = 3;
+settings.section.out = 3;
 
 [files, roots, animals] = get_matFiles(settings.basepath,settings.pattern);
-fprintf('\nSelecting %d: %s',settings.animal,files{settings.animal-1});
-fprintf('\nSelecting %d: %s',settings.animal,files{settings.animal});
-fprintf('\nSelecting %d: %s\n\n',settings.animal,files{settings.animal+1});
+fprintf('\nSelecting %d: %s',    settings.animal-1,files{settings.animal-1});
+fprintf('\nSelecting %d: %s',    settings.animal,  files{settings.animal  });
+fprintf('\nSelecting %d: %s\n\n',settings.animal+1,files{settings.animal+1});
 
 project_pre     = regexprep(animals{settings.animal-1},settings.pattern,'$1');
 savepath_pre    = [workpath project_pre '/'];
@@ -57,6 +59,23 @@ modeler = str2func(sprintf('model_%s',settings.paradigm));
 [D_post, inChannels, modelTrials] = loader(files{settings.animal+1}, settings);
 [D_on, inChannels, modelTrials] = loader(files{settings.animal}, settings);
 
+nNormalDigit = 10;
+nOverrep = 4;
+nExtraDigit = floor((length(unique([D_on.type]))-nNormalDigit)/nOverrep);
+
+digitOverr = zeros(1,nExtraDigit);
+for i = 1:nExtraDigit
+    digitOverr(i) = viewing_codes.(project_on)(nNormalDigit+nOverrep*i);
+end
+
+trialOverr         = zeros(1,length(D_on)) == 1;
+for i=1:nExtraDigit
+    trialOverr     = trialOverr | ([D_on.digit] == digitOverr(i));
+end
+trialBlank         = [D_on.digit] == -1;
+trialOther         = (~trialBlank) & (~trialOverr);
+
+color = struct('pre',[0 0.5 1],'on',[0 0.7 0.3],'post',[1 0.3 0]);
 
 %%
 % ========================================================================%
@@ -82,31 +101,107 @@ info_on = modeler([savepath_on fn_model_on], settings);
 
 
 try
-% Imprved prediction based on annotated models (use model_{paradigm}.m loader)
+% Imprved prediction trained on annotated models (use model_{paradigm}.m loader)
 models             = {info_on.M.ext01, info.M.ext02};
 catch ME
 models             = {info_on.M.ext01};
 end
 
-Xtats_pre          = classGPFAimproved(D_pre, models, 'labelField', info_on.labelField);
-Xtats_on           = classGPFAimproved(D_on, models, 'labelField', info_on.labelField);
+Xtats_pre          = classGPFAimproved(D_pre,  models, 'labelField', info_on.labelField);
+Xtats_on           = classGPFAimproved(D_on,   models, 'labelField', info_on.labelField);
 Xtats_post         = classGPFAimproved(D_post, models, 'labelField', info_on.labelField);
+
+
+%Xtats_blank        = classGPFAimproved(D_on(trialBlank), models, 'labelField', info_on.labelField);
+%Xtats_overr        = classGPFAimproved(D_on(trialOverr), models, 'labelField', info_on.labelField);
+%Xtats_other        = classGPFAimproved(D_on(trialOther), models, 'labelField', info_on.labelField);
 
 mean(Xtats_pre.likelihood)
 mean(Xtats_on.likelihood)
 mean(Xtats_post.likelihood)
 
+like_blank = Xtats_on.likelihood(:,trialBlank);
+like_other = Xtats_on.likelihood(:,trialOther);
+like_overr = Xtats_on.likelihood(:,trialOverr);
 
-like = [Xtats_pre.likelihood(:); Xtats_on.likelihood(:); Xtats_post.likelihood(:)];
-grp = [ repmat({'pre'}, numel(Xtats_pre.likelihood), 1 ); ... 
-        repmat({'on'}, numel(Xtats_on.likelihood), 1 ); ... 
-        repmat({'post'}, numel(Xtats_post.likelihood), 1 ) ];
+like = [Xtats_pre.likelihood(:); ...
+        Xtats_on.likelihood(:); ...
+        like_blank(:); ...
+        like_other(:); ...
+        like_overr(:); ...
+        Xtats_post.likelihood(:)];
+grp = [ repmat({'pre,'}, numel(Xtats_pre.likelihood), 1 ); ... 
+        repmat({'on:'}, numel(Xtats_on.likelihood), 1 ); ... 
+        repmat({'blank'}, numel(like_blank), 1 ); ... 
+        repmat({'other'}, numel(like_other), 1 ); ... 
+        repmat({'overr,'}, numel(like_overr), 1 ); ... 
+        repmat({'post.'}, numel(Xtats_post.likelihood), 1 ) ];
 
 figure();
 boxplot(like,grp);
 xlabel('Session')
 ylabel('Log likelihood')
-title('Posterior of model based on overrepresented digit')
+title('Posterior of model trained on overrepresented digit')
+
+fign = ['fig5-' project_on];
+savefig([fign '.fig']);
+saveas(gcf,[fign '.png'],'png');
+saveas(gcf,[fign '.pdf'],'pdf');
+
+
+%%
+%=========================================================================%
+%========(5b) Posterior of models trained during exposure ================%
+%=========    for pre- and post exposure                  ================%
+%=========================================================================%
+
+
+%Classification stats of P(run events|model)
+
+
+try
+% Imprved prediction trained on annotated models (use model_{paradigm}.m loader)
+models             = {info_on.M.digit, info_on.M.grp02, info_on.M.ext01, info.M.ext02};
+catch ME
+models             = {info_on.M.digit, info_on.M.grp02, info_on.M.ext01};
+end
+
+Xtats_pre          = classGPFAimproved(D_pre,  models, 'labelField', info_on.labelField);
+Xtats_on           = classGPFAimproved(D_on,   models, 'labelField', info_on.labelField);
+Xtats_post         = classGPFAimproved(D_post, models, 'labelField', info_on.labelField);
+
+like_blank = Xtats_on.likelihood(:,trialBlank);
+like_other = Xtats_on.likelihood(:,trialOther);
+like_overr = Xtats_on.likelihood(:,trialOverr);
+
+figure(); hold on
+
+for i_model = 1:length(models)
+    position = (1:2:12) - 1 + 0.4*i_model ;
+    like = [Xtats_pre.likelihood(i_model,:), ...
+            Xtats_on.likelihood(i_model,:), ...
+            like_blank(i_model,:), ...
+            like_other(i_model,:), ...
+            like_overr(i_model,:), ...
+            Xtats_post.likelihood(i_model,:)];
+    grp = [ repmat({'pre,'}, size(Xtats_pre.likelihood,2), 1 ); ... 
+            repmat({'on:'}, size(Xtats_on.likelihood,2), 1 ); ... 
+            repmat({'blank'}, size(like_blank,2), 1 ); ... 
+            repmat({'other'}, size(like_other,2), 1 ); ... 
+            repmat({'overr,'}, size(like_overr,2), 1 ); ... 
+            repmat({'post.'}, size(Xtats_post.likelihood,2), 1 ) ];
+        
+    boxplot(like,grp,'position',position,'width',0.18)
+end
+
+xlabel('Session')
+ylabel('Log likelihood')
+title('Posterior of model trained on overrepresented digit')
+
+fign = ['fig5-' project_on];
+savefig([fign '.fig']);
+saveas(gcf,[fign '.png'],'png');
+saveas(gcf,[fign '.pdf'],'pdf');
 
 
 %%
@@ -118,11 +213,10 @@ title('Posterior of model based on overrepresented digit')
 
 %Classification stats of P(run events|model)
 
+models             = {info_pre.M.all, info_post.M.all};
 
-models             = {info_pre.M.num01, info_post.M.num01};
-
-Xtats_pre          = classGPFAimproved(D_pre, models, 'labelField', info_on.labelField);
-Xtats_on           = classGPFAimproved(D_on, models, 'labelField', info_on.labelField);
+Xtats_pre          = classGPFAimproved(D_pre,  models, 'labelField', info_on.labelField);
+Xtats_on           = classGPFAimproved(D_on,   models, 'labelField', info_on.labelField);
 Xtats_post         = classGPFAimproved(D_post, models, 'labelField', info_on.labelField);
 
 mean(Xtats_pre.likelihood,2)
@@ -130,50 +224,149 @@ mean(Xtats_post.likelihood,2)
 
 
 like = [Xtats_pre.likelihood(:); Xtats_on.likelihood(:); Xtats_post.likelihood(:)];
-grp = [ repmat({'M_{pre}:D_{pre}'; 'M_{post}:D_{pre}'}, size(Xtats_pre.likelihood,2), 1 ); ... 
-        repmat({'M_{pre}:D_{on}'; 'M_{post}:D_{on}'}, size(Xtats_on.likelihood,2), 1 ); ... 
-        repmat({'M_{pre}:D_{post}'; 'M_{post}:D_{post}'}, size(Xtats_post.likelihood,2), 1 ) ];
+grp = [ repmat({'(D_{pre}|M_{pre})'; '(D_{pre}|M_{post})'}, size(Xtats_pre.likelihood,2), 1 ); ... 
+        repmat({'(D_{on}|M_{pre})'; '(D_{on}|M_{post})'}, size(Xtats_on.likelihood,2), 1 ); ... 
+        repmat({'(D_{post}|M_{pre})'; '(D_{post}|M_{post})'}, size(Xtats_post.likelihood,2), 1 ) ];
 
-% FIXME: number of neurons differs !!!
 figure();
 boxplot(like,grp);
 xlabel('Session')
 ylabel('Log likelihood')
-title('Posterior of model based on session')
+title('Posterior of models trained on pre and post session')
+ax = gca;
+ax.XTickLabelRotation = 45;
 
+fign = ['fig6-' project_on];
+savefig([fign '.fig']);
+saveas(gcf,[fign '.png'],'png');
+saveas(gcf,[fign '.pdf'],'pdf');
+
+figure();
+scatter(Xtats_on.likelihood(1,:),  Xtats_on.likelihood(2,:),  [],color.on,'o'); hold on
+scatter(Xtats_pre.likelihood(1,:), Xtats_pre.likelihood(2,:), [],color.pre,'^');
+scatter(Xtats_post.likelihood(1,:),Xtats_post.likelihood(2,:),[],color.post,'s');
+mmin = min([xlim, ylim]);
+mmax = max([xlim, ylim]);
+plot([mmin mmax], [mmin mmax], 'k--');
+xlabel('P(D_{i}|M_{pre})');
+ylabel('P(D_{i}|M_{post})');
+title('Linear classification of all trials in the pre-post axis');
+lgd = legend({'i \in on','i \in pre','i \in post'},'Location','southeast');
+%title(lgd,'String',{'Trial type'});
+%hlgdt = get(lgd,'Title');
+%set(v,'string','Legend Title');
+
+fign = ['fig6b-' project_on];
+savefig([fign '.fig']);
+saveas(gcf,[fign '.png'],'png');
+saveas(gcf,[fign '.pdf'],'pdf');
 
 
 %%
 %=========================================================================%
-%=========(7) Model posterior of post exposure            ================%
-%=========    on evoked activity trials                   ================%
+%========(6c) Model posterior of pre- and post exposure models ===========%
+%========     on evoked activity trials                        ===========%
 %=========================================================================%
 
 
 %Classification stats of P(run events|model)
 
-
-models             = {info_post.M.num01};
+models             = {info_pre.M.all, info_post.M.all};
 
 Xtats_on           = classGPFAimproved(D_on, models, 'labelField', info_on.labelField);
 
-
-like = [Xtats_on.likelihood(:)];
+like_pre = [Xtats_on.likelihood(1,:)];
+like_post = [Xtats_on.likelihood(2,:)];
 grp = [D_on(:).digit];
 
+if sum(models{1}.keep_neurons)~=sum(models{2}.keep_neurons)
+    warning('The number of neurons should be equal in the two models')
+end
+
+% groups of boxplot, based on
+% https://www.mathworks.com/matlabcentral/answers/22-how-do-i-display-different-boxplot-groups-on-the-same-figure-in-matlab
+
+position = -1:1:9;
+
 figure();
-boxplot(like,grp); hold on
-scatter(grp(:),like(:))
+position_pre = position-0.2;
+boxplot(like_pre,grp,'colors','b','positions',position_pre,'width',0.18); hold on
 xlabel('Trial type (digit)')
 ylabel('Log likelihood')
-title('Posterior of post-exposure model based on trial type (evoked)')
+title('Posterior of pre-exposure model trained on trial type (evoked)')
+
+% fign = ['fig6c-' project_on];
+% savefig([fign '.fig']);
+% saveas(gcf,[fign '.png'],'png');
+% saveas(gcf,[fign '.pdf'],'pdf');
+% 
+% figure();
+position_post = position+0.2;
+boxplot(like_post,grp,'colors','g','positions',position_post,'width',0.18);
+xlabel('Trial type (digit)')
+ylabel('Log likelihood')
+title('Posterior of models trained on pre and post-exposure for evoked evoked activity')
+
+% boxplot legend, based on
+% https://www.mathworks.com/matlabcentral/answers/127195-how-do-i-add-a-legend-to-a-boxplot-in-matlab
+
+hBoxes = findall(gca,'Tag','Box');
+% findall is used to find all the graphics objects with tag "box", i.e. the box plot
+hLegend = legend(hBoxes([12 1]), {'pre', 'post'});
+% Among the children of the legend, find the line elements
+hChildren = findall(get(hLegend,'Children'), 'Type','Line');
+
+% Set the horizontal lines to the right colors
+%set(hChildren(2),'Color','b')
+%set(hChildren(1),'Color','g')
+
+% Draw a star to overrepresented digits
+y = ylim;
+vpos = 0.99*y(1)+0.01*y(2);
+plot(digitOverr,vpos,'k*');
+
+set(gca,'XLim',[-2 10])
+set(gca,'XTick',position)
+set(gca,'XTickLabel',position)
+
+% Save
+fign = ['fig6d-' project_on];
+savefig([fign '.fig']);
+saveas(gcf,[fign '.png'],'png');
+saveas(gcf,[fign '.pdf'],'pdf');
 
 
 
+figure();
+label.model = {'pre=1', 'post=2'};
+label.title = 'Classification using trial likelihood according to models';
+label.xaxis = 'j';
+label.yaxis = 'P(trial_i | Model_j)';
+compareLogLike(D_on, Xtats_on, label)
+
+fign = ['fig6e-' project_on];
+savefig([fign '.fig']);
+saveas(gcf,[fign '.png'],'png');
+saveas(gcf,[fign '.pdf'],'pdf');
+
+twidth = 4;
+triangle = [linspace(1,twidth,twidth) linspace(twidth-1,1,twidth-1)];
+triangle = triangle / sum(triangle);
+plot(find(~trialBlank),conv(Xtats_on.class_output(~trialBlank),triangle,'same'))
+set(gca,'YLim',[0.8 2.2])
+set(gca,'YTick',[1 2])
+set(gca,'YTickLabel',{'pre','post'})
+xlabel('Trial ID');
+ylabel('Smoothed decision');
+
+fign = ['fig6f-' project_on];
+savefig([fign '.fig']);
+saveas(gcf,[fign '.png'],'png');
+saveas(gcf,[fign '.pdf'],'pdf');
 
 %%
 %=========================================================================%
-%========(9a) Model posterior of evoked activity digits  =================%
+%========(5b) Model posterior of evoked activity digits  =================%
 %========     in pre- and post exposure                  =================%
 %=========================================================================%
 
@@ -181,7 +374,7 @@ title('Posterior of post-exposure model based on trial type (evoked)')
 %Classification stats of P(run events|model)
 
 
-models             = {info_on.M.all};
+models             = {info_on.M.digit};
 
 Xtats_pre          = classGPFAimproved(D_pre, models, 'labelField', info_on.labelField);
 Xtats_on           = classGPFAimproved(D_on, models, 'labelField', info_on.labelField);
@@ -191,182 +384,39 @@ mean(Xtats_pre.likelihood)
 mean(Xtats_post.likelihood)
 
 
-like = [Xtats_pre.likelihood(:); Xtats_on.likelihood(:); Xtats_post.likelihood(:)];
-grp = [ repmat({'pre'}, numel(Xtats_pre.likelihood), 1 ); ... 
-        repmat({'on'}, numel(Xtats_on.likelihood), 1 ); ... 
-        repmat({'post'}, numel(Xtats_post.likelihood), 1 ) ];
+% like = [Xtats_pre.likelihood(:); Xtats_on.likelihood(:); Xtats_post.likelihood(:)];
+% grp = [ repmat({'pre'}, numel(Xtats_pre.likelihood), 1 ); ... 
+%         repmat({'on'}, numel(Xtats_on.likelihood), 1 ); ... 
+%         repmat({'post'}, numel(Xtats_post.likelihood), 1 ) ];
+
+like_blank = Xtats_on.likelihood(:,trialBlank);
+like_other = Xtats_on.likelihood(:,trialOther);
+like_overr = Xtats_on.likelihood(:,trialOverr);
+
+like = [Xtats_pre.likelihood(:); ...
+        Xtats_on.likelihood(:); ...
+        like_blank(:); ...
+        like_other(:); ...
+        like_overr(:); ...
+        Xtats_post.likelihood(:)];
+grp = [ repmat({'pre,'}, numel(Xtats_pre.likelihood), 1 ); ... 
+        repmat({'on:'}, numel(Xtats_on.likelihood), 1 ); ... 
+        repmat({'blank'}, numel(like_blank), 1 ); ... 
+        repmat({'other'}, numel(like_other), 1 ); ... 
+        repmat({'overr,'}, numel(like_overr), 1 ); ... 
+        repmat({'post.'}, numel(Xtats_post.likelihood), 1 ) ];
 
 figure();
 boxplot(like,grp);
 xlabel('Session')
 ylabel('Log likelihood')
-title('Posterior of model based on evoked activity (digits)')
+title('Posterior of model trained on evoked activity (digits)')
+
+fign = ['fig5b-' project_on];
+savefig([fign '.fig']);
+saveas(gcf,[fign '.png'],'png');
+saveas(gcf,[fign '.pdf'],'pdf');
 
 
 
-%%
-%=========================================================================%
-%========(9b) Model posterior of pre- and post exposure models ===========%
-%========     on evoked activity trials                        ===========%
-%=========================================================================%
 
-
-%Classification stats of P(run events|model)
-
-
-models             = {info_pre.M.num01, info_post.M.num01};
-
-Xtats_on           = classGPFAimproved(D_on, models, 'labelField', info_on.labelField);
-
-
-like_pre = [Xtats_on.likelihood(1,:)];
-like_post = [Xtats_on.likelihood(2,:)];
-grp = [D_on(:).digit];
-
-figure();
-boxplot(like_pre,grp);
-xlabel('Trial type (digit)')
-ylabel('Log likelihood')
-title('Posterior of pre-exposure model based on trial type (evoked)')
-
-figure();
-boxplot(like_post,grp);
-xlabel('Trial type (digit)')
-ylabel('Log likelihood')
-title('Posterior of post-exposure model based on trial type (evoked)')
-
-figure();
-label.model = {'pre', 'post'};
-label.title = 'Classification using trial likelihood according to models';
-label.xaxis = 'j';
-label.yaxis = 'P(trial_i | Model_j)';
-compareLogLike(D_on, Xtats_on, label)
-
-%%
-
-boxplot([Xtats_pre.likelihood; Xtats_post.likelihood]);
-
-Ytats              = Xtats;
-tmp                = cell2mat(models);
-Ytats.class_output = [tmp(Xtats.class_output).prediction];
-label.model        = {tmp.name};
-[Rs.type]          = Rs.digit;
-
-catch ME
-% Basic prediction capabiliy
-models             = struct2cell(info.M);
-Xtats              = classGPFA(Rs, models);
-Ytats              = Xtats;
-Ytats.class_output = Xtats.class_output-1;
-label.model = fieldnamels(info.M);
-end
-
-% %show likelihood given the models
-% % plot show likelihood given the models
-label.title = 'Classification using trial likelihood according to models';
-label.xaxis = 'j';
-label.yaxis = 'P(trial_i | Model_j)';
-compareLogLike(Rs, Ytats, label)
-cm = confusionmat(Ytats.real_label,Ytats.class_output);
-hit_ratio = sum(diag(cm))/sum(sum(cm))
-
-if nModels == 2
-    
-    % Confusion matrix (use for two models only)
-    cm          = [Xtats.conf_matrix];
-    fprintf('hitA: %2.2f%%, hitB: %2.2f%%\n', 100*cm(1,1),100*cm(2,2))
-
-    %XY plot
-    cgergo = load('colors');
-
-    label.title = 'LDA classifier';
-    label.xaxis = 'P(run_j|Model_{left run})';
-    label.yaxis = 'P(run_j|Model_{right run})';
-    LDAclass(Xtats, label, cgergo.cExpon([2 3], :))
-end
-%%
-%=========================================================================%
-%=========(8) Similarity of models   =====================%
-%=========================================================================%
-
-i_model = 1;
-j_model = 1;
-gpfaCompare2(models{i_model},models{j_model});
-
-%%
-%=========================================================================%
-%=========(8) Compute loglike P(wheel|model_wheel)   =====================%
-%=========================================================================%
-
-%If model was not trained it can be loaded:
-load([roots{animal} name_save_file])
-
-%transformation to W testing
-%W           = W(randperm(length(W))); %permutation of laps
-%W           = shufftime(W); %time shuffling for each lap
-
-errorTrials = find([W.type] > 2);                                          %erroneous trials wheel events
-We          = W(errorTrials);                                              %erroneous trials struct                 
-
-%Classification stats of P(proto_event|model) 
-models      = {M_right, M_left};                                           %here models have future run label, 
-Xtats       = classGPFA(W, models);
-
-cm          = [Xtats.conf_matrix];
-fprintf('Max-min Classifier hitA: %2.2f%%, hitB: %2.2f%%\n', 100*cm(1,1),100*cm(2,2))
-
-% plot show likelihood given the models
-label.title = 'P(wheel_j after error | models W)';
-label.modelA = 'Wheel after rigth alt.';
-label.modelB = 'Wheel after left alt.';
-
-label.xaxis = 'j';
-label.yaxis = 'P(wheel_j|model)';
-compareLogLike(W, Xtats, label)                                           %P(error W | models W)
-
-%XY plot
-label.title = '';
-label.modelA = 'Wheel after left alt.';
-label.modelB = 'Wheel after right alt.';
-label.xaxis = 'Log P(wheel|Model_{wheel after left run})';
-label.yaxis = 'Log P(wheel|Model_{wheel after right run})';
-LDAclass(Xtats, label, cgergo.cExpon([2 3], :))
-
-
-
-%%
-%=========================================================================%
-%=========(9) Compute loglike P(wheel|run_model)     =====================%
-%=========================================================================%
-%#TODO: Separate this part v in a different script
-
-in              = 'wheel'; %pre_turn
-out             = 'wheel'; %lat_arm
-maxTime         = 6;
-allTrials       = true; %use all trials of running to test since they are 
-                        %all unseen to the wheel model
-
-S = get_section(D, in, out, debug, namevar); %lap#1: sensor errors 
-W = segment(S, bin_size, Fs, gpfaChannels,...
-                [namevar '_spike_train'], maxTime);
-W = filter_laps(W);
-W = W(randperm(length(W))); 
-
-models      = {M_left, M_right};
-Xtats       = classGPFA(W, models,[],allTrials);
-cm          = [Xtats.conf_matrix];
-fprintf('hitA: %2.2f%%, hitB: %2.2f%%\n', 100*cm(1,1),100*cm(2,2))
-
-% plot show likelihood given the models
-label.title = 'P(wheel_j | run model)';
-label.modelA = 'Run rigth alt.';
-label.modelB = 'Run left alt.';
-label.xaxis = 'j';
-label.yaxis = 'P(wheel_j|run model)';
-compareLogLike(R, Xtats, label)
-
-%XY plot
-label.title = 'Class. with Fisher Disc.';
-label.xaxis = 'P(wheel_j|run right)';
-label.yaxis = 'P(wheel_j|run left)';
-LDAclass(Xtats, label)

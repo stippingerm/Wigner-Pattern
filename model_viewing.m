@@ -12,21 +12,26 @@ nNormalDigit = 10;
 nOverrep = 4;
 
 info.labelField = 'digit';
-info.decoder    = cell(nNormalDigit, 1);
+info.decoder    = cell(nNormalDigit+1, 1);
 
 fields             = fieldnames(info.M);
+
+% build a predictor by scanning and using availabl models
 for i_model = 1:numel(fields)
     field          = fields{i_model};
-    id = -1;
+    
+    % code of the stimulus
+    type = -1;
     if strncmp(field,'num',3)
-        id = str2double(field(4:end));
+        type = str2double(field(4:end));
     end
     if strncmp(field,'ext',3)
-        id = nNormalDigit+str2double(field(4:end))*nOverrep;
+        type = nNormalDigit+str2double(field(4:end))*nOverrep;
     end
     
-    if id > 0
-        prediction = type2digit(id);
+    % predicted digit (or model not included into prediction, e.g. all)
+    if type > 0
+        prediction = type2digit(type);
     else
         prediction = -2;
     end
@@ -41,7 +46,7 @@ for i_model = 1:numel(fields)
     end
     if prediction == -1
         % prediction of blanks
-        prediction = length(info.decoder) + 1;
+        prediction = length(info.decoder);
     end
     if prediction > 0
         info.decoder{prediction} = info.M.(field);

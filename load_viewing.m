@@ -56,22 +56,24 @@ idx_sec=[zeros(nLaps,1),lap_duration];
 on_trans  = [0.4 0.55];
 off_trans = [1.2 1.35];
 
+if isnumeric(settings.section.in)
+    s_in = settings.section.in;
+else
+    s_in = str2double(settings.section.in);
+end
+if isnumeric(settings.section.out)
+    s_out = settings.section.out;
+else
+    s_out = str2double(settings.section.out);
+end
+
 for i_lap = 1:nLaps
     meta(i_lap).events  = [0, on_trans(1);
                            on_trans;
                            on_trans(2), off_trans(1);
                            off_trans;
                            off_trans(2), lap_duration(i_lap)];
-    try
-        s_in = str2double(settings.section.in);
-    catch
-        s_in = settings.section.in;
-    end
-    try
-        s_out = str2double(settings.section.out);
-    catch
-        s_out = settings.section.out;
-    end
+
     time_in  = meta(i_lap).events(s_in,1);
     time_out = meta(i_lap).events(s_out,2);
     idx_sec(i_lap,:) = [min(time_in) max(time_out)];
@@ -239,44 +241,43 @@ model_trials.onefold   = train_laps & ones(nLaps,1);
 Types = unique([D.type]);
 
 % trials representing a digit
-name = 'digit';
-model_trials.(name) = train_laps & ([D.type]' ~= max(Types));
+if length(Types)>2
+    name = 'digit';
+    model_trials.(name) = train_laps & ([D.type]' ~= max(Types));
 
-% collect trials representing a digit
-name = 'digit';
-model_trials.(name) = train_laps & ([D.type]' ~= max(Types));
-
-% collect trials with same label
-for type = Types
-    name = sprintf('num%02d',type);
-    model_trials.(name) = train_laps & ([D.type]' == type);
-    %model_digits.(name) = type2digit(type);
-end
-
-% collect trials with overrepresented symbol
-nNormalDigit = 10;
-nOverrep = 4;
-nExtraDigit = floor((length(unique([D.type]))-nNormalDigit)/nOverrep);
-for extra = 1:nExtraDigit
-    name = sprintf('ext%02d',extra);
-    extra_laps = false;
-    for type = nNormalDigit+(extra-1)*nOverrep+1:nNormalDigit+extra*nOverrep
-        extra_laps = extra_laps | (train_laps & ([D.type]' == type));
+    % collect trials with same label
+    for type = Types
+        name = sprintf('num%02d',type);
+        model_trials.(name) = train_laps & ([D.type]' == type);
+        %model_digits.(name) = type2digit(type);
     end
-    model_trials.(name) = extra_laps;
-    %model_digits.(name) = type2digit(nNormalDigit+extra*nOverrep);
-end
 
-% collect trials for control groups: digits 2..5 or digit 6..9
-nNormalDigit = 2;
-nOverrep = 4;
-nExtraDigit = 2;
-for extra = 1:nExtraDigit
-    name = sprintf('grp%02d',extra);
-    extra_laps = false;
-    for type = nNormalDigit+(extra-1)*nOverrep+1:nNormalDigit+extra*nOverrep
-        extra_laps = extra_laps | (train_laps & ([D.type]' == type));
+    % collect trials with overrepresented symbol
+    nNormalDigit = 10;
+    nOverrep = 4;
+    nExtraDigit = floor((length(unique([D.type]))-nNormalDigit)/nOverrep);
+    for extra = 1:nExtraDigit
+        name = sprintf('ext%02d',extra);
+        extra_laps = false;
+        for type = nNormalDigit+(extra-1)*nOverrep+1:nNormalDigit+extra*nOverrep
+            extra_laps = extra_laps | (train_laps & ([D.type]' == type));
+        end
+        model_trials.(name) = extra_laps;
+        %model_digits.(name) = type2digit(nNormalDigit+extra*nOverrep);
     end
-    model_trials.(name) = extra_laps;
-    %model_digits.(name) = type2digit(nNormalDigit+extra*nOverrep);
+
+    % collect trials for control groups: digits 2..5 or digit 6..9
+    nNormalDigit = 2;
+    nOverrep = 4;
+    nExtraDigit = 2;
+    for extra = 1:nExtraDigit
+        name = sprintf('grp%02d',extra);
+        extra_laps = false;
+        for type = nNormalDigit+(extra-1)*nOverrep+1:nNormalDigit+extra*nOverrep
+            extra_laps = extra_laps | (train_laps & ([D.type]' == type));
+        end
+        model_trials.(name) = extra_laps;
+        %model_digits.(name) = type2digit(nNormalDigit+extra*nOverrep);
+    end
+
 end

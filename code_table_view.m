@@ -9,7 +9,7 @@ codes.identity     = 1:20;
 codes.atoc247a02   = codes.spontaneous;
 codes.atoc247a03   = codes.repetition0;
 codes.atoc247a04   = codes.repetition0;
-codes.atoc247a05   = codes.spontaneous;
+codes.atoc247a05   = codes.spontaneous; % did not get this one
 
 codes.atoc248a01   = codes.spontaneous;
 codes.atoc248a02   = codes.repetition0;
