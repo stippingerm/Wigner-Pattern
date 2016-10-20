@@ -35,6 +35,6 @@ settings.filterTrials    = false; % filter trails with irregular spike count?
 settings.testTrial       = 10;
 settings.train           = 0; %redo training
 settings.nFolds          = 3; %CV folds
-settings.zDim            = 10; %latent dimension
+settings.zDim            = 5; %latent dimension
 settings.maxTime         = 0; %maximum segmentation time, 0 if use all
 settings.maxLength       = 100; %maximum unsplitted time series length, 0 if no limit 
